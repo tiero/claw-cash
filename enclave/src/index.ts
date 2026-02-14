@@ -1,12 +1,17 @@
 import { createHash, createHmac, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { etc, getPublicKey, sign } from "@noble/secp256k1";
+import { etc, getPublicKey, hashes, sign } from "@noble/secp256k1";
 
-// @noble/secp256k1 v3 requires HMAC to be configured for signing
-(etc as Record<string, unknown>).hmacSha256Sync = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
+// @noble/secp256k1 v3 requires hash functions to be configured for signing
+hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
   const hmac = createHmac("sha256", key);
   for (const msg of msgs) hmac.update(msg);
   return new Uint8Array(hmac.digest());
+};
+hashes.sha256 = (...msgs: Uint8Array[]): Uint8Array => {
+  const h = createHash("sha256");
+  for (const msg of msgs) h.update(msg);
+  return new Uint8Array(h.digest());
 };
 import { errors, jwtVerify } from "jose";
 import { z } from "zod";

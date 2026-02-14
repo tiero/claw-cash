@@ -22,7 +22,8 @@ type JsonMap = Record<string, unknown>;
 export class EnclaveClient {
   constructor(
     private readonly baseUrl: string,
-    private readonly internalApiKey: string
+    private readonly internalApiKey: string,
+    private readonly evApiKey?: string
   ) {}
 
   async generate(walletId: string, alg: SupportedAlg): Promise<GenerateResponse> {
@@ -61,26 +62,34 @@ export class EnclaveClient {
   }
 
   private async request<T>(path: string, body: JsonMap): Promise<T> {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "x-internal-api-key": this.internalApiKey
+    };
+    if (this.evApiKey) {
+      headers["api-key"] = this.evApiKey;
+    }
+
     const response = await fetch(`${this.baseUrl}${path}`, {
       method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-internal-api-key": this.internalApiKey
-      },
+      headers,
       body: JSON.stringify(body)
     });
+
+    const text = await response.text();
+    console.log(`[EnclaveClient] ${path} -> ${response.status} ${text.substring(0, 200)}`);
 
     if (!response.ok) {
       let details = "";
       try {
-        const parsed = (await response.json()) as { error?: string };
+        const parsed = JSON.parse(text) as { error?: string };
         details = parsed.error ?? JSON.stringify(parsed);
       } catch {
-        details = await response.text();
+        details = text;
       }
       throw new EnclaveClientError(response.status, details || "Unknown enclave error");
     }
-    return (await response.json()) as T;
+    return JSON.parse(text) as T;
   }
 }
 

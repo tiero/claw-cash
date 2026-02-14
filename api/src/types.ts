@@ -3,6 +3,7 @@ export type SupportedAlg = "secp256k1";
 export interface User {
   id: string;
   telegram_user_id: string;
+  status: "pending" | "active";
   created_at: string;
 }
 
@@ -29,7 +30,7 @@ export interface AuditEvent {
   id: string;
   user_id: string;
   wallet_id: string | null;
-  action: "user.create" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
+  action: "user.create" | "user.confirm" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
   metadata: Record<string, unknown>;
   created_at: string;
 }
@@ -43,6 +44,11 @@ export interface KeyBackup {
 }
 
 export interface SessionClaims {
+  sub: string;
+  telegram_user_id: string;
+}
+
+export interface ConfirmClaims {
   sub: string;
   telegram_user_id: string;
 }

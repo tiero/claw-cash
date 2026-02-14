@@ -2,13 +2,14 @@ import express, { type NextFunction, type Request, type Response } from "express
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
+import { signConfirmToken, signSessionToken, signTicketToken, verifyConfirmToken, verifySessionToken, verifyTicketToken } from "./auth.js";
 import { config } from "./config.js";
 import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
 import { SlidingWindowRateLimiter } from "./rateLimit.js";
 import { InMemoryStore } from "./store.js";
 import type { SessionClaims, SupportedAlg, Wallet } from "./types.js";
 import {
+  confirmUserSchema,
   createSessionSchema,
   createUserSchema,
   createWalletSchema,
@@ -24,7 +25,7 @@ const app = express();
 app.use(express.json({ limit: "32kb" }));
 
 const store = new InMemoryStore(config.backupFilePath);
-const enclaveClient = new EnclaveClient(config.enclaveBaseUrl, config.internalApiKey);
+const enclaveClient = new EnclaveClient(config.enclaveBaseUrl, config.internalApiKey, config.evApiKey || undefined);
 const limiter = new SlidingWindowRateLimiter();
 
 const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
@@ -104,7 +105,43 @@ app.post("/v1/users", (req, res, next) => {
         metadata: { telegram_user_id: user.telegram_user_id }
       });
     }
-    res.status(created ? 201 : 200).json(user);
+    if (user.status === "active") {
+      res.status(200).json(user);
+      return;
+    }
+    const confirm_token = signConfirmToken({
+      sub: user.id,
+      telegram_user_id: user.telegram_user_id
+    });
+    res.status(created ? 201 : 200).json({ ...user, confirm_token });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/users/confirm", (req, res, next) => {
+  try {
+    const body = parse(confirmUserSchema, req.body);
+    const user = store.getUserByTelegramId(body.telegram_user_id);
+    if (!user) {
+      throw new ApiError(404, "User not found");
+    }
+    if (user.status === "active") {
+      res.status(200).json(user);
+      return;
+    }
+    const claims = verifyConfirmToken(body.confirm_token);
+    if (claims.telegram_user_id !== body.telegram_user_id) {
+      throw new ApiError(403, "Token does not match user");
+    }
+    const activated = store.activateUser(user.id);
+    store.addAuditEvent({
+      user_id: user.id,
+      wallet_id: null,
+      action: "user.confirm",
+      metadata: { telegram_user_id: user.telegram_user_id }
+    });
+    res.json(activated);
   } catch (error) {
     next(error);
   }
@@ -116,6 +153,9 @@ app.post("/v1/sessions", (req, res, next) => {
     const user = store.getUserByTelegramId(body.telegram_user_id);
     if (!user) {
       throw new ApiError(404, "User not found, call POST /v1/users first");
+    }
+    if (user.status !== "active") {
+      throw new ApiError(403, "User not confirmed yet");
     }
     if (config.requireOtp) {
       if (!body.otp || !config.validOtpCodes.includes(body.otp)) {

@@ -1,0 +1,22 @@
+{
+  "name": "@clw-cash/skills",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clw-cash/sdk": "workspace:*",
+    "@arkade-os/sdk": "^0.3.12",
+    "@arkade-os/boltz-swap": "^0.2.18",
+    "@lendasat/lendaswap-sdk-pure": "^0.0.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,3 +1,6 @@
 packages:
   - "api"
   - "enclave"
+  - "sdk"
+  - "skills"
+  - "cli"

@@ -1,0 +1,30 @@
+{
+  "name": "@clw-cash/cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "cash": "./dist/index.js"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc",
+    "typecheck": "tsc --noEmit",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@arkade-os/sdk": "^0.3.12",
+    "@clw-cash/sdk": "workspace:*",
+    "@clw-cash/skills": "workspace:*",
+    "@lendasat/lendaswap-sdk-pure": "^0.0.2",
+    "minimist": "^1.2.8"
+  },
+  "devDependencies": {
+    "@types/minimist": "^1.2.5",
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

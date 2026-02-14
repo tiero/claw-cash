@@ -14,6 +14,7 @@ import {
   createIdentitySchema,
   normalizeDigestHex,
   paginationSchema,
+  signBatchSchema,
   signIntentSchema,
   signSchema,
   verifySchema
@@ -301,6 +302,70 @@ app.post("/v1/identities/:id/sign", requireAuth, async (req: Request, res, next)
       metadata: { digest_hash: digestHash }
     });
     res.json({ signature });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/identities/:id/sign-batch", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
+    enforceRateLimit(`identity:${identity.id}:sign`, config.rateLimitPerIdentitySign);
+    const body = parse(signBatchSchema, req.body);
+
+    const signatures: string[] = [];
+    for (const item of body.digests) {
+      const digest = normalizeDigestHex(item.digest);
+      const digestHash = InMemoryStore.digestHash(digest);
+      const nonce = uuidv4();
+      const ticketId = uuidv4();
+      const ticket = signTicketToken({
+        jti: ticketId,
+        sub: user.id,
+        identity_id: identity.id,
+        digest_hash: digestHash,
+        scope: "sign",
+        nonce
+      });
+      const expiresAt = new Date(Date.now() + config.ticketTtlSeconds * 1000).toISOString();
+      store.createTicket({
+        id: ticketId,
+        identity_id: identity.id,
+        digest_hash: digestHash,
+        scope: "sign",
+        expires_at: expiresAt,
+        nonce
+      });
+
+      let signature: string;
+      try {
+        const signed = await enclaveClient.sign(identity.id, digest, ticket);
+        signature = signed.signature;
+      } catch (error) {
+        if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
+          throw error;
+        }
+        const restored = await restoreFromBackupIfAvailable(identity.id);
+        if (!restored) {
+          throw new ApiError(409, "Key not present in enclave and no backup available");
+        }
+        const signed = await enclaveClient.sign(identity.id, digest, ticket);
+        signature = signed.signature;
+      }
+
+      store.markTicketUsed(ticketId);
+      signatures.push(signature);
+    }
+
+    store.addAuditEvent({
+      user_id: user.id,
+      identity_id: identity.id,
+      action: "identity.sign",
+      metadata: { batch_size: body.digests.length }
+    });
+    res.json({ signatures });
   } catch (error) {
     next(error);
   }

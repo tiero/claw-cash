@@ -16,7 +16,7 @@ export type {
 import { Wallet } from "@arkade-os/sdk";
 import { RemoteSignerIdentity, type RemoteSignerConfig } from "@clw-cash/sdk";
 import { ArkadeBitcoinSkill } from "./skills/arkadeBitcoin.js";
-import { ArkaLightningSkill, type ArkaLightningSkillConfig } from "./skills/lightning.js";
+import { ArkadeLightningSkill, type ArkadeLightningSkillConfig } from "./skills/lightning.js";
 import { LendaSwapSkill, type LendaSwapSkillConfig } from "./skills/lendaswap.js";
 
 export interface ClwSkillConfig {
@@ -55,11 +55,11 @@ export async function createClwBitcoinSkill(
 }
 
 /**
- * Create an ArkaLightningSkill powered by a clw.cash remote signer.
+ * Create an ArkadeLightningSkill powered by a clw.cash remote signer.
  */
 export async function createClwLightningSkill(
-  config: ClwSkillConfig & Omit<ArkaLightningSkillConfig, "wallet">
-): Promise<ArkaLightningSkill> {
+  config: ClwSkillConfig & Omit<ArkadeLightningSkillConfig, "wallet">
+): Promise<ArkadeLightningSkill> {
   const identity = new RemoteSignerIdentity({
     apiBaseUrl: config.apiBaseUrl,
     identityId: config.identityId,
@@ -72,7 +72,7 @@ export async function createClwLightningSkill(
     arkServerUrl: config.arkServerUrl,
   });
 
-  return new ArkaLightningSkill({
+  return new ArkadeLightningSkill({
     wallet,
     network: config.network,
     arkProvider: config.arkProvider,

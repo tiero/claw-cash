@@ -28,7 +28,7 @@ const BOLTZ_API_URLS: Record<string, string> = {
   mutinynet: "https://api.boltz.mutinynet.arkade.sh",
 };
 
-export interface ArkaLightningSkillConfig {
+export interface ArkadeLightningSkillConfig {
   wallet: Wallet;
   network: NetworkName;
   arkProvider?: ArkProvider;
@@ -38,8 +38,8 @@ export interface ArkaLightningSkillConfig {
   enableSwapManager?: boolean;
 }
 
-export class ArkaLightningSkill implements LightningSkill {
-  readonly name = "arka-lightning";
+export class ArkadeLightningSkill implements LightningSkill {
+  readonly name = "arkade-lightning";
   readonly description =
     "Lightning Network payments via Boltz submarine swaps for Arkade wallets";
   readonly version = "1.0.0";
@@ -49,7 +49,7 @@ export class ArkaLightningSkill implements LightningSkill {
   private readonly network: NetworkName;
   private readonly swapErrors = new Map<string, string>();
 
-  constructor(config: ArkaLightningSkillConfig) {
+  constructor(config: ArkadeLightningSkillConfig) {
     this.network = config.network;
 
     const boltzApiUrl =
@@ -217,9 +217,9 @@ export class ArkaLightningSkill implements LightningSkill {
 export function createLightningSkill(
   wallet: Wallet,
   network: NetworkName,
-  options?: Partial<Omit<ArkaLightningSkillConfig, "wallet" | "network">>
-): ArkaLightningSkill {
-  return new ArkaLightningSkill({
+  options?: Partial<Omit<ArkadeLightningSkillConfig, "wallet" | "network">>
+): ArkadeLightningSkill {
+  return new ArkadeLightningSkill({
     wallet,
     network,
     ...options,

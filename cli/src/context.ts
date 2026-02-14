@@ -10,7 +10,7 @@ import {
 } from "@lendasat/lendaswap-sdk-pure/node";
 import {
   ArkadeBitcoinSkill,
-  ArkaLightningSkill,
+  ArkadeLightningSkill,
   LendaSwapSkill,
 } from "@clw-cash/skills";
 import type { CashConfig } from "./config.js";
@@ -21,7 +21,7 @@ const LENDASWAP_DB = join(homedir(), ".clw-cash", "lendaswap.db");
 
 export interface CashContext {
   bitcoin: ArkadeBitcoinSkill;
-  lightning: ArkaLightningSkill;
+  lightning: ArkadeLightningSkill;
   swap: LendaSwapSkill;
   dispose(): Promise<void>;
 }
@@ -50,7 +50,7 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
 
   const bitcoin = new ArkadeBitcoinSkill(wallet);
 
-  const lightning = new ArkaLightningSkill({
+  const lightning = new ArkadeLightningSkill({
     wallet,
     network: config.network as NetworkName,
     enableSwapManager: opts?.enableSwapManager,

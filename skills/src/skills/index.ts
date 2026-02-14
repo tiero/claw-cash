@@ -39,9 +39,9 @@ export type {
 export { ArkadeBitcoinSkill, createArkadeBitcoinSkill } from "./arkadeBitcoin.js";
 
 export {
-  ArkaLightningSkill,
+  ArkadeLightningSkill,
   createLightningSkill,
-  type ArkaLightningSkillConfig,
+  type ArkadeLightningSkillConfig,
 } from "./lightning.js";
 
 export {

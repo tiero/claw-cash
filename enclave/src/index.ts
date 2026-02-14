@@ -1,9 +1,18 @@
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { etc, getPublicKey, sign } from "@noble/secp256k1";
-import jwt from "jsonwebtoken";
+
+// @noble/secp256k1 v3 requires HMAC to be configured for signing
+(etc as Record<string, unknown>).hmacSha256Sync = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
+  const hmac = createHmac("sha256", key);
+  for (const msg of msgs) hmac.update(msg);
+  return new Uint8Array(hmac.digest());
+};
+import { errors, jwtVerify } from "jose";
 import { z } from "zod";
 import { config } from "./config.js";
+
+const ticketSecret = new TextEncoder().encode(config.ticketSigningSecret);
 
 type SupportedAlg = "secp256k1";
 
@@ -119,7 +128,7 @@ app.post("/internal/generate", (req, res, next) => {
   }
 });
 
-app.post("/internal/sign", (req, res, next) => {
+app.post("/internal/sign", async (req, res, next) => {
   try {
     pruneReplayCache();
     const body = signSchema.parse(req.body);
@@ -128,9 +137,9 @@ app.post("/internal/sign", (req, res, next) => {
     if (!keyRecord) {
       throw new ApiError(404, "Wallet key not found");
     }
-    const claims = jwt.verify(body.ticket, config.ticketSigningSecret, {
+    const { payload: claims } = await jwtVerify(body.ticket, ticketSecret, {
       algorithms: ["HS256"]
-    }) as TicketClaims;
+    }) as { payload: TicketClaims };
     if (claims.scope !== "sign") {
       throw new ApiError(403, "Invalid ticket scope");
     }
@@ -202,7 +211,7 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
     res.status(400).json({ error: "Validation error", details: error.flatten() });
     return;
   }
-  if (error instanceof jwt.JsonWebTokenError) {
+  if (error instanceof errors.JWSSignatureVerificationFailed || error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed) {
     res.status(401).json({ error: "Invalid ticket signature or expiry" });
     return;
   }

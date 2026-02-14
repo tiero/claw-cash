@@ -26,6 +26,7 @@ export class InMemoryStore {
     const user: User = {
       id: uuidv4(),
       telegram_user_id: telegramUserId,
+      status: "pending",
       created_at: new Date().toISOString()
     };
     this.usersById.set(user.id, user);
@@ -39,6 +40,15 @@ export class InMemoryStore {
 
   getUserById(userId: string): User | undefined {
     return this.usersById.get(userId);
+  }
+
+  activateUser(userId: string): User | undefined {
+    const user = this.usersById.get(userId);
+    if (!user) {
+      return undefined;
+    }
+    user.status = "active";
+    return user;
   }
 
   createWallet(input: Omit<Wallet, "created_at" | "status">): Wallet {

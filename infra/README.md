@@ -19,6 +19,8 @@
 2. Set `ENCLAVE_BASE_URL` to the deployed Evervault enclave domain.
 3. Set matching `INTERNAL_API_KEY` and `TICKET_SIGNING_SECRET`.
 4. Set `SESSION_SIGNING_SECRET` with a separate strong key.
+5. Set `CONFIRM_TOKEN_SECRET` with a separate strong key (used for user signup confirmation JWTs).
+6. Optionally set `CONFIRM_TOKEN_TTL_SECONDS` (default: 300 = 5 minutes).
 
 ## 4) Attestation mode
 

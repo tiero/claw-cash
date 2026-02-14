@@ -15,6 +15,8 @@ Set these in both API and enclave:
 Set API-only:
 
 - `SESSION_SIGNING_SECRET`
+- `CONFIRM_TOKEN_SECRET` (user signup confirmation JWTs)
+- `CONFIRM_TOKEN_TTL_SECONDS` (default: 300)
 - `ENCLAVE_BASE_URL`
 - `BACKUP_FILE_PATH` (unencrypted MVP backup file)
 - `REQUIRE_OTP` and `VALID_OTP_CODES` (optional)
@@ -34,14 +36,15 @@ pnpm --filter ./api start
 
 ## Common operations
 
-1. Create user: `POST /v1/users`
-2. Create session: `POST /v1/sessions`
-3. Create wallet: `POST /v1/wallets`
-4. Sign flow:
+1. Create user: `POST /v1/users` (user starts as `pending`, returns `confirm_token`)
+2. Confirm user: `POST /v1/users/confirm` (activates the user)
+3. Create session: `POST /v1/sessions` (requires `active` user)
+4. Create wallet: `POST /v1/wallets`
+5. Sign flow:
    - `POST /v1/wallets/:id/sign-intent`
    - `POST /v1/wallets/:id/sign`
-5. Destroy wallet: `DELETE /v1/wallets/:id`
-6. Audit list: `GET /v1/audit`
+6. Destroy wallet: `DELETE /v1/wallets/:id`
+7. Audit list: `GET /v1/audit`
 
 ## Incident handling
 
@@ -54,7 +57,7 @@ pnpm --filter ./api start
 
 ## Rotation
 
-- Rotate `TICKET_SIGNING_SECRET` and `SESSION_SIGNING_SECRET` on a schedule.
+- Rotate `TICKET_SIGNING_SECRET`, `SESSION_SIGNING_SECRET`, and `CONFIRM_TOKEN_SECRET` on a schedule.
 - Rotate `INTERNAL_API_KEY` and redeploy both services.
 
 ## TODO before production

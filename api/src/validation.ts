@@ -17,6 +17,11 @@ export const createSessionSchema = z.object({
   otp: z.string().min(1).max(32).optional()
 });
 
+export const confirmUserSchema = z.object({
+  telegram_user_id: telegramUserIdSchema,
+  confirm_token: z.string().min(1)
+});
+
 export const createWalletSchema = z.object({
   alg: z.literal("secp256k1").optional()
 });

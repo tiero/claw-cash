@@ -1,0 +1,26 @@
+# Dependencies
+node_modules
+.pnpm-store
+
+# Build output
+dist
+enclave.eif
+
+# Environment & secrets
+.env*
+*.pem
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+*.swp
+.idea
+.vscode
+
+
+.claude

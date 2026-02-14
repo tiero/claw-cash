@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["ok", "service"],
+  "properties": {
+    "ok": { "type": "boolean", "const": true },
+    "service": { "type": "string" }
+  }
+}

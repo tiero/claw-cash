@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["wallet_id", "digest", "ticket"],
+  "properties": {
+    "wallet_id": { "type": "string", "format": "uuid" },
+    "digest": { "type": "string", "pattern": "^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$" },
+    "ticket": { "type": "string", "minLength": 32, "maxLength": 4096 }
+  }
+}

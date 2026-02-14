@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["token", "expires_in"],
+  "properties": {
+    "token": { "type": "string" },
+    "expires_in": { "type": "integer", "minimum": 1 }
+  }
+}

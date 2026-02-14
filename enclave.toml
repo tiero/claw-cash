@@ -1,0 +1,19 @@
+version = 1
+name = "clw-cash-signer"
+uuid = "enclave_dc9a8ad33667"
+app_uuid = "app_366535fdf2b7"
+team_uuid = "team_e48a089e94da"
+debug = false
+dockerfile = "./enclave/Dockerfile"
+api_key_auth = true
+trx_logging = true
+tls_termination = true
+forward_proxy_protocol = false
+trusted_headers = []
+
+[egress]
+enabled = false
+
+[signing]
+certPath = "./cert.pem"
+keyPath = "./key.pem"

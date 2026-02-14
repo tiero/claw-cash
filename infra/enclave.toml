@@ -1,0 +1,36 @@
+version = 1
+name = "clw-cash-signer"
+uuid = "enclave_dc9a8ad33667"
+app_uuid = "app_366535fdf2b7"
+team_uuid = "team_e48a089e94da"
+debug = true
+dockerfile = "./enclave/Dockerfile"
+api_key_auth = true
+trx_logging = true
+tls_termination = true
+forward_proxy_protocol = false
+trusted_headers = []
+
+[healthcheck]
+path = "/health"
+port = 7000
+
+[egress]
+enabled = false
+
+[scaling]
+desired_replicas = 1
+
+[service]
+port = 7000
+
+[signing]
+certPath = "./infra/cert.pem"
+keyPath = "./infra/key.pem"
+
+[attestation]
+HashAlgorithm = "Sha384 { ... }"
+PCR0 = "a08887fd2cadb3552ecb3a114a016721b271bfd691fddf1711bd9b16f6bf5006f1fdd25e1b37b3069ecfc1cb28fb61e3"
+PCR1 = "0343b056cd8485ca7890ddd833476d78460aed2aa161548e4e26bedf321726696257d623e8805f3f605946b3d8b0c6aa"
+PCR2 = "e9ac0ee953e5275e59f290b549a61dd7e01609f97d1e2bb6fffdaea1b95311fba392e3dda898cfd6b9bf3a7c44363721"
+PCR8 = "ab2fb6f40392d68b8ebb4d6e97dfb46d04101de4a54312320f8d1de707203390b03cb0f0ee4b29fdd5a94f0fa34ec1d3"

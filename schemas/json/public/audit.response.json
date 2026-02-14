@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["items", "limit", "offset", "count"],
+  "properties": {
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "user_id", "wallet_id", "action", "metadata", "created_at"],
+        "properties": {
+          "id": { "type": "string", "format": "uuid" },
+          "user_id": { "type": "string", "format": "uuid" },
+          "wallet_id": { "type": ["string", "null"], "format": "uuid" },
+          "action": {
+            "type": "string",
+            "enum": ["user.create", "session.create", "wallet.create", "wallet.sign", "wallet.destroy"]
+          },
+          "metadata": { "type": "object", "additionalProperties": true },
+          "created_at": { "type": "string", "format": "date-time" }
+        }
+      }
+    },
+    "limit": { "type": "integer", "minimum": 1 },
+    "offset": { "type": "integer", "minimum": 0 },
+    "count": { "type": "integer", "minimum": 0 }
+  }
+}

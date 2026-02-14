@@ -1,0 +1,10 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "telegram_user_id", "created_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "telegram_user_id": { "type": "string" },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

@@ -1,0 +1,367 @@
+openapi: 3.1.0
+info:
+  title: clw.cash API
+  version: 0.1.0
+  description: |
+    MVP API for Create/Sign/Destroy wallet keys with signing delegated to an Evervault Enclave service.
+servers:
+  - url: https://api.example.com
+tags:
+  - name: Public API
+  - name: Internal Enclave API
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    User:
+      type: object
+      required: [id, telegram_user_id, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        telegram_user_id: { type: string }
+        created_at: { type: string, format: date-time }
+    Wallet:
+      type: object
+      required: [id, user_id, alg, public_key, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        alg: { type: string, enum: [secp256k1] }
+        public_key: { type: string }
+        status: { type: string, enum: [active, destroyed] }
+        created_at: { type: string, format: date-time }
+    TicketIntent:
+      type: object
+      required: [id, wallet_id, digest_hash, scope, expires_at, nonce, ticket]
+      properties:
+        id: { type: string, format: uuid }
+        wallet_id: { type: string, format: uuid }
+        digest_hash: { type: string }
+        scope: { type: string, enum: [sign] }
+        expires_at: { type: string, format: date-time }
+        nonce: { type: string }
+        ticket: { type: string }
+    AuditEvent:
+      type: object
+      required: [id, user_id, wallet_id, action, metadata, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        user_id: { type: string, format: uuid }
+        wallet_id:
+          oneOf:
+            - type: string
+              format: uuid
+            - type: "null"
+        action:
+          type: string
+          enum: [user.create, session.create, wallet.create, wallet.sign, wallet.destroy]
+        metadata: { type: object, additionalProperties: true }
+        created_at: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+paths:
+  /health:
+    get:
+      tags: [Public API]
+      summary: Health check
+      responses:
+        "200":
+          description: API health
+  /v1/users:
+    post:
+      tags: [Public API]
+      summary: Create or get user linked to Telegram identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [telegram_user_id]
+              properties:
+                telegram_user_id: { type: string }
+      responses:
+        "201":
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "200":
+          description: Existing user
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+  /v1/sessions:
+    post:
+      tags: [Public API]
+      summary: Authenticate and issue short-lived session token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [telegram_user_id]
+              properties:
+                telegram_user_id: { type: string }
+                otp: { type: string }
+      responses:
+        "200":
+          description: Session created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, expires_in]
+                properties:
+                  token: { type: string }
+                  expires_in: { type: integer }
+        "401":
+          description: Invalid auth challenge
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/wallets:
+    post:
+      tags: [Public API]
+      security:
+        - BearerAuth: []
+      summary: Create wallet and keypair through enclave
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                alg:
+                  type: string
+                  enum: [secp256k1]
+      responses:
+        "201":
+          description: Wallet created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Wallet"
+  /v1/wallets/{id}/sign-intent:
+    post:
+      tags: [Public API]
+      security:
+        - BearerAuth: []
+      summary: Create one-time signing ticket
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [digest]
+              properties:
+                digest:
+                  type: string
+                  pattern: "^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$"
+                scope:
+                  type: string
+                  enum: [sign]
+      responses:
+        "201":
+          description: Sign ticket issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TicketIntent"
+  /v1/wallets/{id}/sign:
+    post:
+      tags: [Public API]
+      security:
+        - BearerAuth: []
+      summary: Submit digest and ticket for signing
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [digest, ticket]
+              properties:
+                digest:
+                  type: string
+                  pattern: "^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$"
+                ticket: { type: string }
+      responses:
+        "200":
+          description: Signature result
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [signature]
+                properties:
+                  signature: { type: string }
+  /v1/wallets/{id}:
+    delete:
+      tags: [Public API]
+      security:
+        - BearerAuth: []
+      summary: Destroy wallet key in enclave and mark wallet destroyed
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Destroyed
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [ok]
+                properties:
+                  ok: { type: boolean }
+  /v1/audit:
+    get:
+      tags: [Public API]
+      security:
+        - BearerAuth: []
+      summary: List current user's audit events
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+        - name: offset
+          in: query
+          required: false
+          schema: { type: integer, minimum: 0, default: 0 }
+      responses:
+        "200":
+          description: Audit event list
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items, limit, offset, count]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AuditEvent"
+                  limit: { type: integer }
+                  offset: { type: integer }
+                  count: { type: integer }
+  /internal/generate:
+    post:
+      tags: [Internal Enclave API]
+      summary: Generate keypair in enclave
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_id, alg]
+              properties:
+                wallet_id: { type: string, format: uuid }
+                alg: { type: string, enum: [secp256k1] }
+      responses:
+        "201":
+          description: Public key
+  /internal/sign:
+    post:
+      tags: [Internal Enclave API]
+      summary: Verify ticket and sign digest
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_id, digest, ticket]
+              properties:
+                wallet_id: { type: string, format: uuid }
+                digest:
+                  type: string
+                  pattern: "^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$"
+                ticket: { type: string }
+      responses:
+        "200":
+          description: Signature
+  /internal/destroy:
+    post:
+      tags: [Internal Enclave API]
+      summary: Delete wallet key from enclave memory
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_id]
+              properties:
+                wallet_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Destroyed
+  /internal/backup/export:
+    post:
+      tags: [Internal Enclave API]
+      summary: Export plaintext private key backup (MVP transitional endpoint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_id]
+              properties:
+                wallet_id: { type: string, format: uuid }
+      responses:
+        "200":
+          description: Backup export
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [alg, private_key]
+                properties:
+                  alg: { type: string, enum: [secp256k1] }
+                  private_key: { type: string }
+  /internal/backup/import:
+    post:
+      tags: [Internal Enclave API]
+      summary: Import plaintext private key backup (MVP transitional endpoint)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [wallet_id, alg, private_key]
+              properties:
+                wallet_id: { type: string, format: uuid }
+                alg: { type: string, enum: [secp256k1] }
+                private_key: { type: string }
+      responses:
+        "200":
+          description: Backup import status

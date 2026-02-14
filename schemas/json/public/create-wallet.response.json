@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["id", "user_id", "alg", "public_key", "status", "created_at"],
+  "properties": {
+    "id": { "type": "string", "format": "uuid" },
+    "user_id": { "type": "string", "format": "uuid" },
+    "alg": { "type": "string", "enum": ["secp256k1"] },
+    "public_key": { "type": "string" },
+    "status": { "type": "string", "enum": ["active", "destroyed"] },
+    "created_at": { "type": "string", "format": "date-time" }
+  }
+}

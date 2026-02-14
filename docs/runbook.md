@@ -2,7 +2,7 @@
 
 ## Services
 
-- API service: public auth/wallet orchestration, Telegram bot.
+- API service: public auth/identity orchestration, Telegram bot.
 - Enclave signer service: internal key operations.
 
 ## Environment
@@ -41,18 +41,18 @@ When `TELEGRAM_BOT_TOKEN` is not set, the API runs in **test mode**: challenges 
 1. Auth challenge: `POST /v1/auth/challenge` (returns `challenge_id` + `deep_link`)
 2. User opens `deep_link` in Telegram, taps Start
 3. Verify challenge: `POST /v1/auth/verify` (returns session `token` + `user`)
-4. Create wallet: `POST /v1/wallets`
+4. Create identity: `POST /v1/identities`
 5. Sign flow:
-   - `POST /v1/wallets/:id/sign-intent`
-   - `POST /v1/wallets/:id/sign`
-6. Destroy wallet: `DELETE /v1/wallets/:id`
+   - `POST /v1/identities/:id/sign-intent`
+   - `POST /v1/identities/:id/sign`
+6. Destroy identity: `DELETE /v1/identities/:id`
 7. Audit list: `GET /v1/audit`
 
 ## Incident handling
 
 - If signing fails with key-not-found after enclave restart:
   - API auto-restores from plaintext backup and retries signing.
-  - If backup is missing, wallet is unrecoverable in current MVP.
+  - If backup is missing, identity is unrecoverable in current MVP.
 - If ticket replay errors appear:
   - Validate clients are not reusing old sign tickets.
   - Verify API and enclave clocks are synchronized.

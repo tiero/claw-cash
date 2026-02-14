@@ -129,7 +129,7 @@ async function get(path: string, token: string) {
 
 describe("Full user journey", () => {
   let sessionToken: string;
-  let walletId: string;
+  let identityId: string;
   let ticket: string;
   const digest = randomBytes(32).toString("hex");
 
@@ -180,9 +180,9 @@ describe("Full user journey", () => {
     expect(status).toBe(202);
   });
 
-  it("POST /v1/wallets — create wallet", async () => {
+  it("POST /v1/identities — create identity", async () => {
     const { status, json } = await post(
-      "/v1/wallets",
+      "/v1/identities",
       { alg: "secp256k1" },
       sessionToken
     );
@@ -191,12 +191,12 @@ describe("Full user journey", () => {
     expect(json.public_key).toBeDefined();
     expect(json.alg).toBe("secp256k1");
     expect(json.status).toBe("active");
-    walletId = json.id;
+    identityId = json.id;
   });
 
-  it("POST /v1/wallets/:id/sign-intent — get ticket", async () => {
+  it("POST /v1/identities/:id/sign-intent — get ticket", async () => {
     const { status, json } = await post(
-      `/v1/wallets/${walletId}/sign-intent`,
+      `/v1/identities/${identityId}/sign-intent`,
       { digest, scope: "sign" },
       sessionToken
     );
@@ -206,9 +206,9 @@ describe("Full user journey", () => {
     ticket = json.ticket;
   });
 
-  it("POST /v1/wallets/:id/sign — sign digest", async () => {
+  it("POST /v1/identities/:id/sign — sign digest", async () => {
     const { status, json } = await post(
-      `/v1/wallets/${walletId}/sign`,
+      `/v1/identities/${identityId}/sign`,
       { digest, ticket },
       sessionToken
     );
@@ -218,9 +218,9 @@ describe("Full user journey", () => {
     expect(json.signature.length).toBeGreaterThan(0);
   });
 
-  it("POST /v1/wallets/:id/sign — replay ticket returns 409", async () => {
+  it("POST /v1/identities/:id/sign — replay ticket returns 409", async () => {
     const { status, json } = await post(
-      `/v1/wallets/${walletId}/sign`,
+      `/v1/identities/${identityId}/sign`,
       { digest, ticket },
       sessionToken
     );
@@ -235,22 +235,22 @@ describe("Full user journey", () => {
     const actions = json.items.map((e: { action: string }) => e.action);
     expect(actions).toContain("user.create");
     expect(actions).toContain("session.create");
-    expect(actions).toContain("wallet.create");
-    expect(actions).toContain("wallet.sign");
+    expect(actions).toContain("identity.create");
+    expect(actions).toContain("identity.sign");
   });
 
-  it("DELETE /v1/wallets/:id — destroy wallet", async () => {
+  it("DELETE /v1/identities/:id — destroy identity", async () => {
     const { status, json } = await del(
-      `/v1/wallets/${walletId}`,
+      `/v1/identities/${identityId}`,
       sessionToken
     );
     expect(status).toBe(200);
     expect(json.ok).toBe(true);
   });
 
-  it("POST /v1/wallets/:id/sign-intent — destroyed wallet returns 409", async () => {
+  it("POST /v1/identities/:id/sign-intent — destroyed identity returns 409", async () => {
     const { status } = await post(
-      `/v1/wallets/${walletId}/sign-intent`,
+      `/v1/identities/${identityId}/sign-intent`,
       { digest: randomBytes(32).toString("hex"), scope: "sign" },
       sessionToken
     );
@@ -259,14 +259,14 @@ describe("Full user journey", () => {
 });
 
 describe("Auth guards", () => {
-  it("POST /v1/wallets without token returns 401", async () => {
-    const { status } = await post("/v1/wallets", { alg: "secp256k1" });
+  it("POST /v1/identities without token returns 401", async () => {
+    const { status } = await post("/v1/identities", { alg: "secp256k1" });
     expect(status).toBe(401);
   });
 
-  it("POST /v1/wallets with bad token returns 401", async () => {
+  it("POST /v1/identities with bad token returns 401", async () => {
     const { status } = await post(
-      "/v1/wallets",
+      "/v1/identities",
       { alg: "secp256k1" },
       "invalid-token"
     );

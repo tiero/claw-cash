@@ -2,11 +2,11 @@
 
 Privy, for AI Agents.
 
-Secure wallet infrastructure that lets AI agents hold, sign, and transact with Bitcoin and stablecoins. Private keys live inside hardware enclaves — your agent gets a simple API, never touches the raw key material.
+Secure identity infrastructure that lets AI agents hold, sign, and transact with Bitcoin and stablecoins. Private keys live inside hardware enclaves — your agent gets a simple API, never touches the raw key material.
 
 ## How it works
 
-An AI agent calls the clw.cash API to create wallets and request signatures. The actual signing happens inside an [Evervault Enclave](https://evervault.com/primitives/enclaves) — a hardened, attestable execution environment where private keys are generated and never leave.
+An AI agent calls the clw.cash API to create identities and request signatures. The actual signing happens inside an [Evervault Enclave](https://evervault.com/primitives/enclaves) — a hardened, attestable execution environment where private keys are generated and never leave.
 
 ```
 Agent ──► clw.cash API ──► Enclave (signs with secp256k1)
@@ -17,11 +17,11 @@ Agent ──► clw.cash API ──► Enclave (signs with secp256k1)
 ## Features
 
 - **Enclave-backed signing** — keys generated and stored in a hardware enclave with attestation
-- **Wallet lifecycle** — create, sign, destroy wallets via REST API
+- **Identity lifecycle** — create, sign, destroy identities via REST API
 - **Ticket-based signing** — two-step sign-intent / sign flow with JWT tickets to prevent replay
 - **Telegram auth** — login via Telegram bot deep link (challenge/verify flow)
-- **Audit trail** — every action logged with user, wallet, and metadata
-- **Rate limiting** — sliding window limits per user and per wallet
+- **Audit trail** — every action logged with user, identity, and metadata
+- **Rate limiting** — sliding window limits per user and per identity
 - **Key backup/restore** — encrypted backup with automatic restore on enclave miss
 
 ## TODO

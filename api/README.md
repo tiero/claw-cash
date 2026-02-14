@@ -1,16 +1,16 @@
 # API Service
 
-External API service for user/session management, wallet metadata, ticket issuance, audit logs, and orchestration of enclave key operations.
+External API service for user/session management, identity metadata, ticket issuance, audit logs, and orchestration of enclave key operations.
 
 ## Endpoints
 
 - `POST /v1/users` — create or get user (returns `confirm_token` if pending)
 - `POST /v1/users/confirm` — confirm user account with token
 - `POST /v1/sessions` — create session (requires confirmed user)
-- `POST /v1/wallets`
-- `POST /v1/wallets/:id/sign-intent`
-- `POST /v1/wallets/:id/sign`
-- `DELETE /v1/wallets/:id`
+- `POST /v1/identities`
+- `POST /v1/identities/:id/sign-intent`
+- `POST /v1/identities/:id/sign`
+- `DELETE /v1/identities/:id`
 - `GET /v1/audit`
 - `GET /health`
 

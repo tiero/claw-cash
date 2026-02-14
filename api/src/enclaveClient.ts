@@ -26,36 +26,36 @@ export class EnclaveClient {
     private readonly evApiKey?: string
   ) {}
 
-  async generate(walletId: string, alg: SupportedAlg): Promise<GenerateResponse> {
+  async generate(identityId: string, alg: SupportedAlg): Promise<GenerateResponse> {
     return this.request<GenerateResponse>("/internal/generate", {
-      wallet_id: walletId,
+      identity_id: identityId,
       alg
     });
   }
 
-  async sign(walletId: string, digest: string, ticket: string): Promise<SignResponse> {
+  async sign(identityId: string, digest: string, ticket: string): Promise<SignResponse> {
     return this.request<SignResponse>("/internal/sign", {
-      wallet_id: walletId,
+      identity_id: identityId,
       digest,
       ticket
     });
   }
 
-  async destroy(walletId: string): Promise<DestroyResponse> {
+  async destroy(identityId: string): Promise<DestroyResponse> {
     return this.request<DestroyResponse>("/internal/destroy", {
-      wallet_id: walletId
+      identity_id: identityId
     });
   }
 
-  async exportKey(walletId: string): Promise<ExportKeyResponse> {
+  async exportKey(identityId: string): Promise<ExportKeyResponse> {
     return this.request<ExportKeyResponse>("/internal/backup/export", {
-      wallet_id: walletId
+      identity_id: identityId
     });
   }
 
-  async importKey(walletId: string, alg: SupportedAlg, privateKey: string): Promise<{ ok: true }> {
+  async importKey(identityId: string, alg: SupportedAlg, privateKey: string): Promise<{ ok: true }> {
     return this.request<{ ok: true }>("/internal/backup/import", {
-      wallet_id: walletId,
+      identity_id: identityId,
       alg,
       private_key: privateKey
     });

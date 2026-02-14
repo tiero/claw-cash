@@ -3,7 +3,7 @@ info:
   title: clw.cash API
   version: 0.1.0
   description: |
-    MVP API for Create/Sign/Destroy wallet keys with signing delegated to an Evervault Enclave service.
+    MVP API for Create/Sign/Destroy identity keys with signing delegated to an Evervault Enclave service.
 servers:
   - url: https://api.example.com
 tags:
@@ -23,7 +23,7 @@ components:
         id: { type: string, format: uuid }
         telegram_user_id: { type: string }
         created_at: { type: string, format: date-time }
-    Wallet:
+    Identity:
       type: object
       required: [id, user_id, alg, public_key, status, created_at]
       properties:
@@ -35,10 +35,10 @@ components:
         created_at: { type: string, format: date-time }
     TicketIntent:
       type: object
-      required: [id, wallet_id, digest_hash, scope, expires_at, nonce, ticket]
+      required: [id, identity_id, digest_hash, scope, expires_at, nonce, ticket]
       properties:
         id: { type: string, format: uuid }
-        wallet_id: { type: string, format: uuid }
+        identity_id: { type: string, format: uuid }
         digest_hash: { type: string }
         scope: { type: string, enum: [sign] }
         expires_at: { type: string, format: date-time }
@@ -46,18 +46,18 @@ components:
         ticket: { type: string }
     AuditEvent:
       type: object
-      required: [id, user_id, wallet_id, action, metadata, created_at]
+      required: [id, user_id, identity_id, action, metadata, created_at]
       properties:
         id: { type: string, format: uuid }
         user_id: { type: string, format: uuid }
-        wallet_id:
+        identity_id:
           oneOf:
             - type: string
               format: uuid
             - type: "null"
         action:
           type: string
-          enum: [user.create, session.create, wallet.create, wallet.sign, wallet.destroy]
+          enum: [user.create, session.create, identity.create, identity.sign, identity.destroy]
         metadata: { type: object, additionalProperties: true }
         created_at: { type: string, format: date-time }
     Error:
@@ -130,12 +130,12 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
-  /v1/wallets:
+  /v1/identities:
     post:
       tags: [Public API]
       security:
         - BearerAuth: []
-      summary: Create wallet and keypair through enclave
+      summary: Create identity and keypair through enclave
       requestBody:
         required: false
         content:
@@ -148,12 +148,12 @@ paths:
                   enum: [secp256k1]
       responses:
         "201":
-          description: Wallet created
+          description: Identity created
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/Wallet"
-  /v1/wallets/{id}/sign-intent:
+                $ref: "#/components/schemas/Identity"
+  /v1/identities/{id}/sign-intent:
     post:
       tags: [Public API]
       security:
@@ -185,7 +185,7 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/TicketIntent"
-  /v1/wallets/{id}/sign:
+  /v1/identities/{id}/sign:
     post:
       tags: [Public API]
       security:
@@ -218,12 +218,12 @@ paths:
                 required: [signature]
                 properties:
                   signature: { type: string }
-  /v1/wallets/{id}:
+  /v1/identities/{id}:
     delete:
       tags: [Public API]
       security:
         - BearerAuth: []
-      summary: Destroy wallet key in enclave and mark wallet destroyed
+      summary: Destroy identity key in enclave and mark identity destroyed
       parameters:
         - name: id
           in: path
@@ -280,9 +280,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [wallet_id, alg]
+              required: [identity_id, alg]
               properties:
-                wallet_id: { type: string, format: uuid }
+                identity_id: { type: string, format: uuid }
                 alg: { type: string, enum: [secp256k1] }
       responses:
         "201":
@@ -297,9 +297,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [wallet_id, digest, ticket]
+              required: [identity_id, digest, ticket]
               properties:
-                wallet_id: { type: string, format: uuid }
+                identity_id: { type: string, format: uuid }
                 digest:
                   type: string
                   pattern: "^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$"
@@ -310,16 +310,16 @@ paths:
   /internal/destroy:
     post:
       tags: [Internal Enclave API]
-      summary: Delete wallet key from enclave memory
+      summary: Delete identity key from enclave memory
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [wallet_id]
+              required: [identity_id]
               properties:
-                wallet_id: { type: string, format: uuid }
+                identity_id: { type: string, format: uuid }
       responses:
         "200":
           description: Destroyed
@@ -333,9 +333,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [wallet_id]
+              required: [identity_id]
               properties:
-                wallet_id: { type: string, format: uuid }
+                identity_id: { type: string, format: uuid }
       responses:
         "200":
           description: Backup export
@@ -357,9 +357,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [wallet_id, alg, private_key]
+              required: [identity_id, alg, private_key]
               properties:
-                wallet_id: { type: string, format: uuid }
+                identity_id: { type: string, format: uuid }
                 alg: { type: string, enum: [secp256k1] }
                 private_key: { type: string }
       responses:

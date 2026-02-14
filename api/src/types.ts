@@ -7,7 +7,7 @@ export interface User {
   created_at: string;
 }
 
-export interface Wallet {
+export interface Identity {
   id: string;
   user_id: string;
   alg: SupportedAlg;
@@ -18,7 +18,7 @@ export interface Wallet {
 
 export interface Ticket {
   id: string;
-  wallet_id: string;
+  identity_id: string;
   digest_hash: string;
   scope: "sign";
   expires_at: string;
@@ -29,14 +29,14 @@ export interface Ticket {
 export interface AuditEvent {
   id: string;
   user_id: string;
-  wallet_id: string | null;
-  action: "user.create" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
+  identity_id: string | null;
+  action: "user.create" | "session.create" | "identity.create" | "identity.sign" | "identity.destroy";
   metadata: Record<string, unknown>;
   created_at: string;
 }
 
 export interface KeyBackup {
-  wallet_id: string;
+  identity_id: string;
   alg: SupportedAlg;
   private_key: string;
   created_at: string;
@@ -58,7 +58,7 @@ export interface SessionClaims {
 export interface TicketClaims {
   jti: string;
   sub: string;
-  wallet_id: string;
+  identity_id: string;
   digest_hash: string;
   scope: "sign";
   nonce: string;

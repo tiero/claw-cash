@@ -21,7 +21,7 @@ export const config = {
   backupFilePath: process.env.BACKUP_FILE_PATH ?? "./api-data/key-backups.json",
   rateLimitWindowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
   rateLimitPerUser: parseNumber(process.env.RATE_LIMIT_PER_USER, 60),
-  rateLimitPerWalletSign: parseNumber(process.env.RATE_LIMIT_PER_WALLET_SIGN, 20),
+  rateLimitPerIdentitySign: parseNumber(process.env.RATE_LIMIT_PER_IDENTITY_SIGN, 20),
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "",
   challengeTtlSeconds: parseNumber(process.env.CHALLENGE_TTL_SECONDS, 300),

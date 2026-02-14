@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["wallet_id", "alg"],
+  "required": ["identity_id", "alg"],
   "properties": {
-    "wallet_id": { "type": "string", "format": "uuid" },
+    "identity_id": { "type": "string", "format": "uuid" },
     "alg": { "type": "string", "enum": ["secp256k1"] }
   }
 }

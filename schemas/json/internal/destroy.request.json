@@ -2,8 +2,8 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "additionalProperties": false,
-  "required": ["wallet_id"],
+  "required": ["identity_id"],
   "properties": {
-    "wallet_id": { "type": "string", "format": "uuid" }
+    "identity_id": { "type": "string", "format": "uuid" }
   }
 }

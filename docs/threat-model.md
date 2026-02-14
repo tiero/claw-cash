@@ -5,7 +5,7 @@
 - Private keys generated inside enclave.
 - Ticket signing secret.
 - Session signing secret.
-- Audit logs and wallet metadata.
+- Audit logs and identity metadata.
 - MVP plaintext key backups (temporary risk).
 
 ## Trust boundaries
@@ -18,13 +18,13 @@
 ## Main threats and controls
 
 1. Unauthorized signing request
-   - Control: bearer auth + wallet ownership checks + signed ticket + TTL + nonce replay cache.
+   - Control: bearer auth + identity ownership checks + signed ticket + TTL + nonce replay cache.
 2. Ticket forgery
    - Control: HMAC ticket signature verification in API and enclave.
 3. Ticket replay
    - Control: nonce replay cache in enclave + one-time `used_at` in API ticket store.
 4. Abuse / brute force
-   - Control: per-user and per-wallet rate limits.
+   - Control: per-user and per-identity rate limits.
 5. Enclave restart key loss
    - Control: MVP backup export/import with auto-restore in API.
 6. Backup disclosure (MVP risk)

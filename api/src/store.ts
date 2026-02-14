@@ -2,15 +2,15 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { v4 as uuidv4 } from "uuid";
-import type { AuditEvent, Challenge, KeyBackup, Ticket, User, Wallet } from "./types.js";
+import type { AuditEvent, Challenge, Identity, KeyBackup, Ticket, User } from "./types.js";
 
 export class InMemoryStore {
   private readonly usersById = new Map<string, User>();
   private readonly usersByTelegramId = new Map<string, User>();
-  private readonly walletsById = new Map<string, Wallet>();
+  private readonly identitiesById = new Map<string, Identity>();
   private readonly ticketsById = new Map<string, Ticket>();
   private readonly auditEvents: AuditEvent[] = [];
-  private readonly backupsByWalletId = new Map<string, KeyBackup>();
+  private readonly backupsByIdentityId = new Map<string, KeyBackup>();
   private readonly challengesById = new Map<string, Challenge>();
   private readonly backupFilePath: string;
 
@@ -43,31 +43,31 @@ export class InMemoryStore {
     return this.usersById.get(userId);
   }
 
-  createWallet(input: Omit<Wallet, "created_at" | "status">): Wallet {
-    const wallet: Wallet = {
+  createIdentity(input: Omit<Identity, "created_at" | "status">): Identity {
+    const identity: Identity = {
       ...input,
       status: "active",
       created_at: new Date().toISOString()
     };
-    this.walletsById.set(wallet.id, wallet);
-    return wallet;
+    this.identitiesById.set(identity.id, identity);
+    return identity;
   }
 
-  getWallet(walletId: string): Wallet | undefined {
-    return this.walletsById.get(walletId);
+  getIdentity(identityId: string): Identity | undefined {
+    return this.identitiesById.get(identityId);
   }
 
-  listWalletsByUser(userId: string): Wallet[] {
-    return [...this.walletsById.values()].filter((wallet) => wallet.user_id === userId);
+  listIdentitiesByUser(userId: string): Identity[] {
+    return [...this.identitiesById.values()].filter((identity) => identity.user_id === userId);
   }
 
-  markWalletDestroyed(walletId: string): void {
-    const wallet = this.walletsById.get(walletId);
-    if (!wallet) {
+  markIdentityDestroyed(identityId: string): void {
+    const identity = this.identitiesById.get(identityId);
+    if (!identity) {
       return;
     }
-    wallet.status = "destroyed";
-    this.walletsById.set(walletId, wallet);
+    identity.status = "destroyed";
+    this.identitiesById.set(identityId, identity);
   }
 
   createTicket(input: Omit<Ticket, "used_at">): Ticket {
@@ -158,23 +158,23 @@ export class InMemoryStore {
 
   putBackup(backup: Omit<KeyBackup, "created_at" | "updated_at">): KeyBackup {
     const now = new Date().toISOString();
-    const existing = this.backupsByWalletId.get(backup.wallet_id);
+    const existing = this.backupsByIdentityId.get(backup.identity_id);
     const next: KeyBackup = {
       ...backup,
       created_at: existing?.created_at ?? now,
       updated_at: now
     };
-    this.backupsByWalletId.set(next.wallet_id, next);
+    this.backupsByIdentityId.set(next.identity_id, next);
     this.persistBackupsToDisk();
     return next;
   }
 
-  getBackup(walletId: string): KeyBackup | undefined {
-    return this.backupsByWalletId.get(walletId);
+  getBackup(identityId: string): KeyBackup | undefined {
+    return this.backupsByIdentityId.get(identityId);
   }
 
-  deleteBackup(walletId: string): void {
-    this.backupsByWalletId.delete(walletId);
+  deleteBackup(identityId: string): void {
+    this.backupsByIdentityId.delete(identityId);
     this.persistBackupsToDisk();
   }
 
@@ -189,8 +189,8 @@ export class InMemoryStore {
     try {
       const raw = readFileSync(this.backupFilePath, "utf-8");
       const parsed = JSON.parse(raw) as Record<string, KeyBackup>;
-      for (const [walletId, backup] of Object.entries(parsed)) {
-        this.backupsByWalletId.set(walletId, backup);
+      for (const [identityId, backup] of Object.entries(parsed)) {
+        this.backupsByIdentityId.set(identityId, backup);
       }
     } catch {
       // Ignore malformed backup files in MVP mode.
@@ -200,7 +200,7 @@ export class InMemoryStore {
   private persistBackupsToDisk(): void {
     const parent = dirname(this.backupFilePath);
     mkdirSync(parent, { recursive: true });
-    const serializable = Object.fromEntries(this.backupsByWalletId.entries());
+    const serializable = Object.fromEntries(this.backupsByIdentityId.entries());
     writeFileSync(this.backupFilePath, JSON.stringify(serializable, null, 2), "utf-8");
   }
 }

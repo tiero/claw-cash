@@ -24,7 +24,7 @@ type SupportedAlg = "secp256k1";
 interface TicketClaims {
   jti: string;
   sub: string;
-  wallet_id: string;
+  identity_id: string;
   digest_hash: string;
   scope: "sign";
   nonce: string;
@@ -32,7 +32,7 @@ interface TicketClaims {
 }
 
 interface KeyRecord {
-  wallet_id: string;
+  identity_id: string;
   alg: SupportedAlg;
   private_key: string;
   public_key: string;
@@ -42,26 +42,26 @@ interface KeyRecord {
 const app = express();
 app.use(express.json({ limit: "32kb" }));
 
-const keysByWalletId = new Map<string, KeyRecord>();
+const keysByIdentityId = new Map<string, KeyRecord>();
 const nonceReplayCache = new Map<string, number>();
 
 const generateSchema = z.object({
-  wallet_id: z.string().uuid(),
+  identity_id: z.string().uuid(),
   alg: z.literal("secp256k1")
 });
 
 const signSchema = z.object({
-  wallet_id: z.string().uuid(),
+  identity_id: z.string().uuid(),
   digest: z.string().regex(/^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$/),
   ticket: z.string().min(32).max(4096)
 });
 
 const destroySchema = z.object({
-  wallet_id: z.string().uuid()
+  identity_id: z.string().uuid()
 });
 
 const importSchema = z.object({
-  wallet_id: z.string().uuid(),
+  identity_id: z.string().uuid(),
   alg: z.literal("secp256k1"),
   private_key: z.string().regex(/^[a-fA-F0-9]{64}$/)
 });
@@ -116,12 +116,12 @@ app.get("/health", (_req, res) => {
 app.post("/internal/generate", (req, res, next) => {
   try {
     const body = generateSchema.parse(req.body);
-    if (keysByWalletId.has(body.wallet_id)) {
-      throw new ApiError(409, "Wallet key already exists in enclave");
+    if (keysByIdentityId.has(body.identity_id)) {
+      throw new ApiError(409, "Identity key already exists in enclave");
     }
     const { privateKeyHex, publicKeyHex } = generateKey();
-    keysByWalletId.set(body.wallet_id, {
-      wallet_id: body.wallet_id,
+    keysByIdentityId.set(body.identity_id, {
+      identity_id: body.identity_id,
       alg: body.alg,
       private_key: privateKeyHex,
       public_key: publicKeyHex,
@@ -138,9 +138,9 @@ app.post("/internal/sign", async (req, res, next) => {
     pruneReplayCache();
     const body = signSchema.parse(req.body);
     const digestHex = normalizeDigestHex(body.digest);
-    const keyRecord = keysByWalletId.get(body.wallet_id);
+    const keyRecord = keysByIdentityId.get(body.identity_id);
     if (!keyRecord) {
-      throw new ApiError(404, "Wallet key not found");
+      throw new ApiError(404, "Identity key not found");
     }
     const { payload: claims } = await jwtVerify(body.ticket, ticketSecret, {
       algorithms: ["HS256"]
@@ -148,8 +148,8 @@ app.post("/internal/sign", async (req, res, next) => {
     if (claims.scope !== "sign") {
       throw new ApiError(403, "Invalid ticket scope");
     }
-    if (claims.wallet_id !== body.wallet_id) {
-      throw new ApiError(403, "Ticket wallet mismatch");
+    if (claims.identity_id !== body.identity_id) {
+      throw new ApiError(403, "Ticket identity mismatch");
     }
     if (claims.digest_hash !== digestHash(digestHex)) {
       throw new ApiError(403, "Ticket digest mismatch");
@@ -168,10 +168,10 @@ app.post("/internal/sign", async (req, res, next) => {
 app.post("/internal/destroy", (req, res, next) => {
   try {
     const body = destroySchema.parse(req.body);
-    if (!keysByWalletId.has(body.wallet_id)) {
-      throw new ApiError(404, "Wallet key not found");
+    if (!keysByIdentityId.has(body.identity_id)) {
+      throw new ApiError(404, "Identity key not found");
     }
-    keysByWalletId.delete(body.wallet_id);
+    keysByIdentityId.delete(body.identity_id);
     res.json({ ok: true });
   } catch (error) {
     next(error);
@@ -181,9 +181,9 @@ app.post("/internal/destroy", (req, res, next) => {
 app.post("/internal/backup/export", (req, res, next) => {
   try {
     const body = destroySchema.parse(req.body);
-    const keyRecord = keysByWalletId.get(body.wallet_id);
+    const keyRecord = keysByIdentityId.get(body.identity_id);
     if (!keyRecord) {
-      throw new ApiError(404, "Wallet key not found");
+      throw new ApiError(404, "Identity key not found");
     }
     res.json({
       alg: keyRecord.alg,
@@ -198,8 +198,8 @@ app.post("/internal/backup/import", (req, res, next) => {
   try {
     const body = importSchema.parse(req.body);
     const publicKeyHex = etc.bytesToHex(getPublicKey(etc.hexToBytes(body.private_key), true));
-    keysByWalletId.set(body.wallet_id, {
-      wallet_id: body.wallet_id,
+    keysByIdentityId.set(body.identity_id, {
+      identity_id: body.identity_id,
       alg: body.alg,
       private_key: body.private_key,
       public_key: publicKeyHex,

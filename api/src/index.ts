@@ -8,10 +8,10 @@ import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
 import { SlidingWindowRateLimiter } from "./rateLimit.js";
 import { InMemoryStore } from "./store.js";
 import { TelegramBot } from "./telegramBot.js";
-import type { SessionClaims, SupportedAlg, Wallet } from "./types.js";
+import type { Identity, SessionClaims, SupportedAlg } from "./types.js";
 import {
   challengeRequestSchema,
-  createWalletSchema,
+  createIdentitySchema,
   normalizeDigestHex,
   paginationSchema,
   signIntentSchema,
@@ -60,18 +60,18 @@ const currentUserFromRequest = (req: AuthenticatedRequest): { id: string; telegr
   return { id: user.id, telegram_user_id: user.telegram_user_id };
 };
 
-const requireOwnedActiveWallet = (walletId: string, userId: string): Wallet => {
-  const wallet = store.getWallet(walletId);
-  if (!wallet) {
-    throw new ApiError(404, "Wallet not found");
+const requireOwnedActiveIdentity = (identityId: string, userId: string): Identity => {
+  const identity = store.getIdentity(identityId);
+  if (!identity) {
+    throw new ApiError(404, "Identity not found");
   }
-  if (wallet.user_id !== userId) {
-    throw new ApiError(403, "Wallet does not belong to session user");
+  if (identity.user_id !== userId) {
+    throw new ApiError(403, "Identity does not belong to session user");
   }
-  if (wallet.status !== "active") {
-    throw new ApiError(409, "Wallet is not active");
+  if (identity.status !== "active") {
+    throw new ApiError(409, "Identity is not active");
   }
-  return wallet;
+  return identity;
 };
 
 const enforceRateLimit = (key: string, limit: number): void => {
@@ -80,12 +80,12 @@ const enforceRateLimit = (key: string, limit: number): void => {
   }
 };
 
-const restoreFromBackupIfAvailable = async (walletId: string): Promise<boolean> => {
-  const backup = store.getBackup(walletId);
+const restoreFromBackupIfAvailable = async (identityId: string): Promise<boolean> => {
+  const backup = store.getBackup(identityId);
   if (!backup) {
     return false;
   }
-  await enclaveClient.importKey(walletId, backup.alg, backup.private_key);
+  await enclaveClient.importKey(identityId, backup.alg, backup.private_key);
   return true;
 };
 
@@ -136,7 +136,7 @@ app.post("/v1/auth/verify", (req, res, next) => {
     if (created) {
       store.addAuditEvent({
         user_id: user.id,
-        wallet_id: null,
+        identity_id: null,
         action: "user.create",
         metadata: { telegram_user_id: user.telegram_user_id }
       });
@@ -148,7 +148,7 @@ app.post("/v1/auth/verify", (req, res, next) => {
     });
     store.addAuditEvent({
       user_id: user.id,
-      wallet_id: null,
+      identity_id: null,
       action: "session.create",
       metadata: {}
     });
@@ -167,46 +167,46 @@ app.post("/v1/auth/verify", (req, res, next) => {
   }
 });
 
-// ── Wallets ───────────────────────────────────────────────
+// ── Identities ───────────────────────────────────────────
 
-app.post("/v1/wallets", requireAuth, async (req: Request, res, next) => {
+app.post("/v1/identities", requireAuth, async (req: Request, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const user = currentUserFromRequest(authReq);
-    enforceRateLimit(`user:${user.id}:wallet_create`, config.rateLimitPerUser);
-    const body = parse(createWalletSchema, req.body);
-    const walletId = uuidv4();
+    enforceRateLimit(`user:${user.id}:identity_create`, config.rateLimitPerUser);
+    const body = parse(createIdentitySchema, req.body);
+    const identityId = uuidv4();
     const alg: SupportedAlg = body.alg ?? "secp256k1";
-    const generated = await enclaveClient.generate(walletId, alg);
-    const exported = await enclaveClient.exportKey(walletId);
+    const generated = await enclaveClient.generate(identityId, alg);
+    const exported = await enclaveClient.exportKey(identityId);
     store.putBackup({
-      wallet_id: walletId,
+      identity_id: identityId,
       alg: exported.alg,
       private_key: exported.private_key
     });
-    const wallet = store.createWallet({
-      id: walletId,
+    const identity = store.createIdentity({
+      id: identityId,
       user_id: user.id,
       alg,
       public_key: generated.public_key
     });
     store.addAuditEvent({
       user_id: user.id,
-      wallet_id: wallet.id,
-      action: "wallet.create",
-      metadata: { alg: wallet.alg }
+      identity_id: identity.id,
+      action: "identity.create",
+      metadata: { alg: identity.alg }
     });
-    res.status(201).json(wallet);
+    res.status(201).json(identity);
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/v1/wallets/:id/sign-intent", requireAuth, (req: Request, res, next) => {
+app.post("/v1/identities/:id/sign-intent", requireAuth, (req: Request, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const user = currentUserFromRequest(authReq);
-    const wallet = requireOwnedActiveWallet(req.params.id, user.id);
+    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
     enforceRateLimit(`user:${user.id}:sign_intent`, config.rateLimitPerUser);
     const body = parse(signIntentSchema, req.body);
     const digest = normalizeDigestHex(body.digest);
@@ -216,7 +216,7 @@ app.post("/v1/wallets/:id/sign-intent", requireAuth, (req: Request, res, next) =
     const ticket = signTicketToken({
       jti: ticketId,
       sub: user.id,
-      wallet_id: wallet.id,
+      identity_id: identity.id,
       digest_hash: digestHash,
       scope: body.scope ?? "sign",
       nonce
@@ -224,7 +224,7 @@ app.post("/v1/wallets/:id/sign-intent", requireAuth, (req: Request, res, next) =
     const expiresAt = new Date(Date.now() + config.ticketTtlSeconds * 1000).toISOString();
     store.createTicket({
       id: ticketId,
-      wallet_id: wallet.id,
+      identity_id: identity.id,
       digest_hash: digestHash,
       scope: "sign",
       expires_at: expiresAt,
@@ -232,7 +232,7 @@ app.post("/v1/wallets/:id/sign-intent", requireAuth, (req: Request, res, next) =
     });
     res.status(201).json({
       id: ticketId,
-      wallet_id: wallet.id,
+      identity_id: identity.id,
       digest_hash: digestHash,
       nonce,
       scope: "sign",
@@ -244,12 +244,12 @@ app.post("/v1/wallets/:id/sign-intent", requireAuth, (req: Request, res, next) =
   }
 });
 
-app.post("/v1/wallets/:id/sign", requireAuth, async (req: Request, res, next) => {
+app.post("/v1/identities/:id/sign", requireAuth, async (req: Request, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const user = currentUserFromRequest(authReq);
-    const wallet = requireOwnedActiveWallet(req.params.id, user.id);
-    enforceRateLimit(`wallet:${wallet.id}:sign`, config.rateLimitPerWalletSign);
+    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
+    enforceRateLimit(`identity:${identity.id}:sign`, config.rateLimitPerIdentitySign);
     const body = parse(signSchema, req.body);
     const digest = normalizeDigestHex(body.digest);
     const digestHash = InMemoryStore.digestHash(digest);
@@ -257,8 +257,8 @@ app.post("/v1/wallets/:id/sign", requireAuth, async (req: Request, res, next) =>
     if (claims.sub !== user.id) {
       throw new ApiError(403, "Ticket user mismatch");
     }
-    if (claims.wallet_id !== wallet.id) {
-      throw new ApiError(403, "Ticket wallet mismatch");
+    if (claims.identity_id !== identity.id) {
+      throw new ApiError(403, "Ticket identity mismatch");
     }
     if (claims.scope !== "sign") {
       throw new ApiError(403, "Ticket scope mismatch");
@@ -279,25 +279,25 @@ app.post("/v1/wallets/:id/sign", requireAuth, async (req: Request, res, next) =>
 
     let signature: string;
     try {
-      const signed = await enclaveClient.sign(wallet.id, digest, body.ticket);
+      const signed = await enclaveClient.sign(identity.id, digest, body.ticket);
       signature = signed.signature;
     } catch (error) {
       if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
         throw error;
       }
-      const restored = await restoreFromBackupIfAvailable(wallet.id);
+      const restored = await restoreFromBackupIfAvailable(identity.id);
       if (!restored) {
         throw new ApiError(409, "Key not present in enclave and no backup available");
       }
-      const signed = await enclaveClient.sign(wallet.id, digest, body.ticket);
+      const signed = await enclaveClient.sign(identity.id, digest, body.ticket);
       signature = signed.signature;
     }
 
     store.markTicketUsed(ticket.id);
     store.addAuditEvent({
       user_id: user.id,
-      wallet_id: wallet.id,
-      action: "wallet.sign",
+      identity_id: identity.id,
+      action: "identity.sign",
       metadata: { digest_hash: digestHash }
     });
     res.json({ signature });
@@ -306,30 +306,30 @@ app.post("/v1/wallets/:id/sign", requireAuth, async (req: Request, res, next) =>
   }
 });
 
-app.delete("/v1/wallets/:id", requireAuth, async (req: Request, res, next) => {
+app.delete("/v1/identities/:id", requireAuth, async (req: Request, res, next) => {
   try {
     const authReq = req as AuthenticatedRequest;
     const user = currentUserFromRequest(authReq);
-    const wallet = requireOwnedActiveWallet(req.params.id, user.id);
-    enforceRateLimit(`wallet:${wallet.id}:destroy`, config.rateLimitPerUser);
+    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
+    enforceRateLimit(`identity:${identity.id}:destroy`, config.rateLimitPerUser);
 
     try {
-      await enclaveClient.destroy(wallet.id);
+      await enclaveClient.destroy(identity.id);
     } catch (error) {
       if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
         throw error;
       }
-      const restored = await restoreFromBackupIfAvailable(wallet.id);
+      const restored = await restoreFromBackupIfAvailable(identity.id);
       if (restored) {
-        await enclaveClient.destroy(wallet.id);
+        await enclaveClient.destroy(identity.id);
       }
     }
-    store.markWalletDestroyed(wallet.id);
-    store.deleteBackup(wallet.id);
+    store.markIdentityDestroyed(identity.id);
+    store.deleteBackup(identity.id);
     store.addAuditEvent({
       user_id: user.id,
-      wallet_id: wallet.id,
-      action: "wallet.destroy",
+      identity_id: identity.id,
+      action: "identity.destroy",
       metadata: { reason: "user-request" }
     });
     res.json({ ok: true });

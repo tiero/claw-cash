@@ -1,10 +1,10 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
-  "required": ["id", "wallet_id", "digest_hash", "scope", "expires_at", "nonce", "ticket"],
+  "required": ["id", "identity_id", "digest_hash", "scope", "expires_at", "nonce", "ticket"],
   "properties": {
     "id": { "type": "string", "format": "uuid" },
-    "wallet_id": { "type": "string", "format": "uuid" },
+    "identity_id": { "type": "string", "format": "uuid" },
     "digest_hash": { "type": "string" },
     "scope": { "type": "string", "enum": ["sign"] },
     "expires_at": { "type": "string", "format": "date-time" },

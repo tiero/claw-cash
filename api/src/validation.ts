@@ -14,7 +14,7 @@ export const verifySchema = z.object({
   challenge_id: z.string().uuid()
 });
 
-export const createWalletSchema = z.object({
+export const createIdentitySchema = z.object({
   alg: z.literal("secp256k1").optional()
 });
 

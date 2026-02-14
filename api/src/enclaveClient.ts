@@ -14,7 +14,7 @@ interface DestroyResponse {
 
 interface ExportKeyResponse {
   alg: SupportedAlg;
-  private_key: string;
+  sealed_key: string;
 }
 
 type JsonMap = Record<string, unknown>;
@@ -53,11 +53,11 @@ export class EnclaveClient {
     });
   }
 
-  async importKey(identityId: string, alg: SupportedAlg, privateKey: string): Promise<{ ok: true }> {
+  async importKey(identityId: string, alg: SupportedAlg, sealedKey: string): Promise<{ ok: true }> {
     return this.request<{ ok: true }>("/internal/backup/import", {
       identity_id: identityId,
       alg,
-      private_key: privateKey
+      sealed_key: sealedKey
     });
   }
 

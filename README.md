@@ -53,6 +53,8 @@ pnpm --filter ./api start
 
 API runs on `http://127.0.0.1:4000`, enclave on `http://127.0.0.1:7000`.
 
+Key backups are encrypted before leaving the enclave. In production, Evervault's internal encrypt/decrypt API (port 9999) handles this automatically — no key to provision. Locally, an AES-256-GCM fallback is used with a dev-only default key.
+
 ## Deploy to Evervault
 
 Install the [Evervault CLI](https://docs.evervault.com/cli), then:

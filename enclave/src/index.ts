@@ -1,4 +1,4 @@
-import { createHash, createHmac, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
 import { etc, getPublicKey, hashes, sign } from "@noble/secp256k1";
 
@@ -18,6 +18,56 @@ import { z } from "zod";
 import { config } from "./config.js";
 
 const ticketSecret = new TextEncoder().encode(config.ticketSigningSecret);
+const sealingKeyBuf = Buffer.from(config.sealingKey, "hex");
+
+// AES-256-GCM fallback for local dev (no Evervault runtime)
+const sealKeyLocal = (plaintextHex: string): string => {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", sealingKeyBuf, iv);
+  const encrypted = Buffer.concat([cipher.update(plaintextHex, "utf8"), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString("hex")}:${encrypted.toString("hex")}:${tag.toString("hex")}`;
+};
+
+const unsealKeyLocal = (sealed: string): string => {
+  const parts = sealed.split(":");
+  if (parts.length !== 3) throw new ApiError(400, "Malformed sealed key");
+  const iv = Buffer.from(parts[0], "hex");
+  const encrypted = Buffer.from(parts[1], "hex");
+  const tag = Buffer.from(parts[2], "hex");
+  const decipher = createDecipheriv("aes-256-gcm", sealingKeyBuf, iv);
+  decipher.setAuthTag(tag);
+  return decipher.update(encrypted, undefined, "utf8") + decipher.final("utf8");
+};
+
+// Evervault internal API (port 9999, only available inside enclave)
+const sealKey = async (plaintextHex: string): Promise<string> => {
+  try {
+    const res = await fetch(`${config.evEncryptUrl}/encrypt`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(plaintextHex)
+    });
+    if (res.ok) return await res.text();
+  } catch {
+    // Evervault runtime not available — fall back to local AES
+  }
+  return sealKeyLocal(plaintextHex);
+};
+
+const unsealKey = async (sealed: string): Promise<string> => {
+  try {
+    const res = await fetch(`${config.evEncryptUrl}/decrypt`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(sealed)
+    });
+    if (res.ok) return await res.text();
+  } catch {
+    // Evervault runtime not available — fall back to local AES
+  }
+  return unsealKeyLocal(sealed);
+};
 
 type SupportedAlg = "secp256k1";
 
@@ -63,7 +113,7 @@ const destroySchema = z.object({
 const importSchema = z.object({
   identity_id: z.string().uuid(),
   alg: z.literal("secp256k1"),
-  private_key: z.string().regex(/^[a-fA-F0-9]{64}$/)
+  sealed_key: z.string().min(1)
 });
 
 const normalizeDigestHex = (digest: string): string => {
@@ -178,7 +228,7 @@ app.post("/internal/destroy", (req, res, next) => {
   }
 });
 
-app.post("/internal/backup/export", (req, res, next) => {
+app.post("/internal/backup/export", async (req, res, next) => {
   try {
     const body = destroySchema.parse(req.body);
     const keyRecord = keysByIdentityId.get(body.identity_id);
@@ -187,21 +237,22 @@ app.post("/internal/backup/export", (req, res, next) => {
     }
     res.json({
       alg: keyRecord.alg,
-      private_key: keyRecord.private_key
+      sealed_key: await sealKey(keyRecord.private_key)
     });
   } catch (error) {
     next(error);
   }
 });
 
-app.post("/internal/backup/import", (req, res, next) => {
+app.post("/internal/backup/import", async (req, res, next) => {
   try {
     const body = importSchema.parse(req.body);
-    const publicKeyHex = etc.bytesToHex(getPublicKey(etc.hexToBytes(body.private_key), true));
+    const privateKeyHex = await unsealKey(body.sealed_key);
+    const publicKeyHex = etc.bytesToHex(getPublicKey(etc.hexToBytes(privateKeyHex), true));
     keysByIdentityId.set(body.identity_id, {
       identity_id: body.identity_id,
       alg: body.alg,
-      private_key: body.private_key,
+      private_key: privateKeyHex,
       public_key: publicKeyHex,
       created_at: new Date().toISOString()
     });

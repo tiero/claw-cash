@@ -19,7 +19,7 @@ Agent ──► clw.cash API ──► Enclave (signs with secp256k1)
 - **Enclave-backed signing** — keys generated and stored in a hardware enclave with attestation
 - **Wallet lifecycle** — create, sign, destroy wallets via REST API
 - **Ticket-based signing** — two-step sign-intent / sign flow with JWT tickets to prevent replay
-- **2FA with Telegram** — user confirmation and OTP via Telegram callbacks
+- **Telegram auth** — login via Telegram bot deep link (challenge/verify flow)
 - **Audit trail** — every action logged with user, wallet, and metadata
 - **Rate limiting** — sliding window limits per user and per wallet
 - **Key backup/restore** — encrypted backup with automatic restore on enclave miss

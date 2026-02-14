@@ -2,21 +2,21 @@ import express, { type NextFunction, type Request, type Response } from "express
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
-import { signConfirmToken, signSessionToken, signTicketToken, verifyConfirmToken, verifySessionToken, verifyTicketToken } from "./auth.js";
+import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
 import { config } from "./config.js";
 import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
 import { SlidingWindowRateLimiter } from "./rateLimit.js";
 import { InMemoryStore } from "./store.js";
+import { TelegramBot } from "./telegramBot.js";
 import type { SessionClaims, SupportedAlg, Wallet } from "./types.js";
 import {
-  confirmUserSchema,
-  createSessionSchema,
-  createUserSchema,
+  challengeRequestSchema,
   createWalletSchema,
   normalizeDigestHex,
   paginationSchema,
   signIntentSchema,
-  signSchema
+  signSchema,
+  verifySchema
 } from "./validation.js";
 
 type AuthenticatedRequest = Request & { auth: SessionClaims };
@@ -89,14 +89,50 @@ const restoreFromBackupIfAvailable = async (walletId: string): Promise<boolean> 
   return true;
 };
 
+const botEnabled = config.telegramBotToken.length > 0;
+
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "api" });
 });
 
-app.post("/v1/users", (req, res, next) => {
+// ── Auth: Challenge / Verify ──────────────────────────────
+
+app.post("/v1/auth/challenge", (req, res, next) => {
   try {
-    const body = parse(createUserSchema, req.body);
-    const { user, created } = store.createOrGetUser(body.telegram_user_id);
+    const body = parse(challengeRequestSchema, req.body);
+    const challenge = store.createChallenge(config.challengeTtlSeconds);
+
+    // Test mode: when bot is not configured, auto-resolve with provided telegram_user_id
+    if (!botEnabled && body.telegram_user_id) {
+      store.resolveChallenge(challenge.id, body.telegram_user_id);
+    }
+
+    const deepLink = botEnabled
+      ? `https://t.me/${config.telegramBotUsername}?start=${challenge.id}`
+      : null;
+
+    res.status(201).json({
+      challenge_id: challenge.id,
+      expires_at: challenge.expires_at,
+      deep_link: deepLink
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/auth/verify", (req, res, next) => {
+  try {
+    const body = parse(verifySchema, req.body);
+    const challenge = store.getChallenge(body.challenge_id);
+    if (!challenge) {
+      throw new ApiError(404, "Challenge not found or expired");
+    }
+    if (!challenge.telegram_user_id) {
+      throw new ApiError(202, "Challenge not yet resolved, user has not confirmed via Telegram");
+    }
+
+    const { user, created } = store.createOrGetUser(challenge.telegram_user_id);
     if (created) {
       store.addAuditEvent({
         user_id: user.id,
@@ -105,63 +141,7 @@ app.post("/v1/users", (req, res, next) => {
         metadata: { telegram_user_id: user.telegram_user_id }
       });
     }
-    if (user.status === "active") {
-      res.status(200).json(user);
-      return;
-    }
-    const confirm_token = signConfirmToken({
-      sub: user.id,
-      telegram_user_id: user.telegram_user_id
-    });
-    res.status(created ? 201 : 200).json({ ...user, confirm_token });
-  } catch (error) {
-    next(error);
-  }
-});
 
-app.post("/v1/users/confirm", (req, res, next) => {
-  try {
-    const body = parse(confirmUserSchema, req.body);
-    const user = store.getUserByTelegramId(body.telegram_user_id);
-    if (!user) {
-      throw new ApiError(404, "User not found");
-    }
-    if (user.status === "active") {
-      res.status(200).json(user);
-      return;
-    }
-    const claims = verifyConfirmToken(body.confirm_token);
-    if (claims.telegram_user_id !== body.telegram_user_id) {
-      throw new ApiError(403, "Token does not match user");
-    }
-    const activated = store.activateUser(user.id);
-    store.addAuditEvent({
-      user_id: user.id,
-      wallet_id: null,
-      action: "user.confirm",
-      metadata: { telegram_user_id: user.telegram_user_id }
-    });
-    res.json(activated);
-  } catch (error) {
-    next(error);
-  }
-});
-
-app.post("/v1/sessions", (req, res, next) => {
-  try {
-    const body = parse(createSessionSchema, req.body);
-    const user = store.getUserByTelegramId(body.telegram_user_id);
-    if (!user) {
-      throw new ApiError(404, "User not found, call POST /v1/users first");
-    }
-    if (user.status !== "active") {
-      throw new ApiError(403, "User not confirmed yet");
-    }
-    if (config.requireOtp) {
-      if (!body.otp || !config.validOtpCodes.includes(body.otp)) {
-        throw new ApiError(401, "OTP validation failed");
-      }
-    }
     const token = signSessionToken({
       sub: user.id,
       telegram_user_id: user.telegram_user_id
@@ -170,16 +150,24 @@ app.post("/v1/sessions", (req, res, next) => {
       user_id: user.id,
       wallet_id: null,
       action: "session.create",
-      metadata: { otp_required: config.requireOtp }
+      metadata: {}
     });
+
     res.json({
       token,
-      expires_in: config.sessionTtlSeconds
+      expires_in: config.sessionTtlSeconds,
+      user: {
+        id: user.id,
+        telegram_user_id: user.telegram_user_id,
+        status: user.status
+      }
     });
   } catch (error) {
     next(error);
   }
 });
+
+// ── Wallets ───────────────────────────────────────────────
 
 app.post("/v1/wallets", requireAuth, async (req: Request, res, next) => {
   try {
@@ -367,6 +355,8 @@ app.get("/v1/audit", requireAuth, (req: Request, res, next) => {
   }
 });
 
+// ── Error handler ─────────────────────────────────────────
+
 app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   if (error instanceof z.ZodError) {
     res.status(400).json({ error: "Validation error", details: error.flatten() });
@@ -387,6 +377,15 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   const message = error instanceof Error ? error.message : "Internal server error";
   res.status(500).json({ error: message });
 });
+
+// ── Start ─────────────────────────────────────────────────
+
+if (botEnabled) {
+  const bot = new TelegramBot({ token: config.telegramBotToken, store });
+  bot.start();
+  // eslint-disable-next-line no-console
+  console.log(`Telegram bot started (@${config.telegramBotUsername})`);
+}
 
 app.listen(config.port, () => {
   // eslint-disable-next-line no-console

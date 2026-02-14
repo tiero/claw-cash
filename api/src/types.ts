@@ -30,7 +30,7 @@ export interface AuditEvent {
   id: string;
   user_id: string;
   wallet_id: string | null;
-  action: "user.create" | "user.confirm" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
+  action: "user.create" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
   metadata: Record<string, unknown>;
   created_at: string;
 }
@@ -43,12 +43,14 @@ export interface KeyBackup {
   updated_at: string;
 }
 
-export interface SessionClaims {
-  sub: string;
-  telegram_user_id: string;
+export interface Challenge {
+  id: string;
+  telegram_user_id: string | null;
+  created_at: string;
+  expires_at: string;
 }
 
-export interface ConfirmClaims {
+export interface SessionClaims {
   sub: string;
   telegram_user_id: string;
 }

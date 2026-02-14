@@ -1,25 +1,17 @@
 import { z } from "zod";
 
-export const telegramUserIdSchema = z.string().min(1).max(64);
-
 const digestPattern = /^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$/;
 
 export const normalizeDigestHex = (digest: string): string => {
   return digest.startsWith("0x") ? digest.slice(2).toLowerCase() : digest.toLowerCase();
 };
 
-export const createUserSchema = z.object({
-  telegram_user_id: telegramUserIdSchema
+export const challengeRequestSchema = z.object({
+  telegram_user_id: z.string().min(1).max(64).optional()
 });
 
-export const createSessionSchema = z.object({
-  telegram_user_id: telegramUserIdSchema,
-  otp: z.string().min(1).max(32).optional()
-});
-
-export const confirmUserSchema = z.object({
-  telegram_user_id: telegramUserIdSchema,
-  confirm_token: z.string().min(1)
+export const verifySchema = z.object({
+  challenge_id: z.string().uuid()
 });
 
 export const createWalletSchema = z.object({

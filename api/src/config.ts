@@ -1,10 +1,3 @@
-const parseBoolean = (value: string | undefined, fallback: boolean): boolean => {
-  if (value === undefined) {
-    return fallback;
-  }
-  return value.toLowerCase() === "true";
-};
-
 const parseNumber = (value: string | undefined, fallback: number): number => {
   if (value === undefined || value.trim().length === 0) {
     return fallback;
@@ -25,12 +18,11 @@ export const config = {
   sessionSigningSecret: process.env.SESSION_SIGNING_SECRET ?? "session-secret-dev-only",
   ticketTtlSeconds: parseNumber(process.env.TICKET_TTL_SECONDS, 90),
   sessionTtlSeconds: parseNumber(process.env.SESSION_TTL_SECONDS, 3600),
-  requireOtp: parseBoolean(process.env.REQUIRE_OTP, false),
-  validOtpCodes: (process.env.VALID_OTP_CODES ?? "").split(",").map((v) => v.trim()).filter(Boolean),
   backupFilePath: process.env.BACKUP_FILE_PATH ?? "./api-data/key-backups.json",
   rateLimitWindowMs: parseNumber(process.env.RATE_LIMIT_WINDOW_MS, 60_000),
   rateLimitPerUser: parseNumber(process.env.RATE_LIMIT_PER_USER, 60),
   rateLimitPerWalletSign: parseNumber(process.env.RATE_LIMIT_PER_WALLET_SIGN, 20),
-  confirmTokenSecret: process.env.CONFIRM_TOKEN_SECRET ?? "confirm-secret-dev-only",
-  confirmTokenTtlSeconds: parseNumber(process.env.CONFIRM_TOKEN_TTL_SECONDS, 300)
+  telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
+  telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "",
+  challengeTtlSeconds: parseNumber(process.env.CHALLENGE_TTL_SECONDS, 300),
 };

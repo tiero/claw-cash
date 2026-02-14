@@ -2,7 +2,7 @@
 
 ## Services
 
-- API service: external auth/session/wallet orchestration.
+- API service: public auth/wallet orchestration, Telegram bot.
 - Enclave signer service: internal key operations.
 
 ## Environment
@@ -15,11 +15,11 @@ Set these in both API and enclave:
 Set API-only:
 
 - `SESSION_SIGNING_SECRET`
-- `CONFIRM_TOKEN_SECRET` (user signup confirmation JWTs)
-- `CONFIRM_TOKEN_TTL_SECONDS` (default: 300)
 - `ENCLAVE_BASE_URL`
 - `BACKUP_FILE_PATH` (unencrypted MVP backup file)
-- `REQUIRE_OTP` and `VALID_OTP_CODES` (optional)
+- `TELEGRAM_BOT_TOKEN` (from @BotFather; omit to enable test mode)
+- `TELEGRAM_BOT_USERNAME` (bot username without @, for deep link generation)
+- `CHALLENGE_TTL_SECONDS` (default: 300)
 
 ## Startup (local)
 
@@ -29,6 +29,8 @@ pnpm --filter ./enclave start
 pnpm --filter ./api start
 ```
 
+When `TELEGRAM_BOT_TOKEN` is not set, the API runs in **test mode**: challenges auto-resolve when a `telegram_user_id` is provided in the challenge request body.
+
 ## Health checks
 
 - API: `GET /health`
@@ -36,9 +38,9 @@ pnpm --filter ./api start
 
 ## Common operations
 
-1. Create user: `POST /v1/users` (user starts as `pending`, returns `confirm_token`)
-2. Confirm user: `POST /v1/users/confirm` (activates the user)
-3. Create session: `POST /v1/sessions` (requires `active` user)
+1. Auth challenge: `POST /v1/auth/challenge` (returns `challenge_id` + `deep_link`)
+2. User opens `deep_link` in Telegram, taps Start
+3. Verify challenge: `POST /v1/auth/verify` (returns session `token` + `user`)
 4. Create wallet: `POST /v1/wallets`
 5. Sign flow:
    - `POST /v1/wallets/:id/sign-intent`
@@ -54,11 +56,15 @@ pnpm --filter ./api start
 - If ticket replay errors appear:
   - Validate clients are not reusing old sign tickets.
   - Verify API and enclave clocks are synchronized.
+- If Telegram bot stops resolving challenges:
+  - Check `TELEGRAM_BOT_TOKEN` is valid (`curl https://api.telegram.org/bot<token>/getMe`).
+  - Check API logs for `[telegram-bot] polling error` messages.
 
 ## Rotation
 
-- Rotate `TICKET_SIGNING_SECRET`, `SESSION_SIGNING_SECRET`, and `CONFIRM_TOKEN_SECRET` on a schedule.
+- Rotate `TICKET_SIGNING_SECRET` and `SESSION_SIGNING_SECRET` on a schedule.
 - Rotate `INTERNAL_API_KEY` and redeploy both services.
+- Rotate `TELEGRAM_BOT_TOKEN` by creating a new bot token via @BotFather and redeploying API.
 
 ## TODO before production
 

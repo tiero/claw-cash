@@ -11,7 +11,6 @@ const ENCLAVE_BASE = `http://127.0.0.1:${ENCLAVE_PORT}`;
 const INTERNAL_API_KEY = "e2e-test-key";
 const TICKET_SECRET = "e2e-ticket-secret";
 const SESSION_SECRET = "e2e-session-secret";
-const CONFIRM_SECRET = "e2e-confirm-secret";
 const TELEGRAM_USER_ID = "e2e_user_" + Date.now();
 
 const env = {
@@ -19,8 +18,7 @@ const env = {
   INTERNAL_API_KEY,
   TICKET_SIGNING_SECRET: TICKET_SECRET,
   SESSION_SIGNING_SECRET: SESSION_SECRET,
-  CONFIRM_TOKEN_SECRET: CONFIRM_SECRET,
-  REQUIRE_OTP: "false",
+  // No TELEGRAM_BOT_TOKEN — enables test mode (auto-resolve challenges)
   BACKUP_FILE_PATH: `/tmp/clw-e2e-backups-${Date.now()}.json`,
 };
 
@@ -130,7 +128,6 @@ async function get(path: string, token: string) {
 // ── Tests ──────────────────────────────────────────────────
 
 describe("Full user journey", () => {
-  let confirmToken: string;
   let sessionToken: string;
   let walletId: string;
   let ticket: string;
@@ -143,33 +140,44 @@ describe("Full user journey", () => {
     expect(body).toEqual({ ok: true, service: "api" });
   });
 
-  it("POST /v1/users — create user (pending)", async () => {
-    const { status, json } = await post("/v1/users", {
+  it("POST /v1/auth/challenge — create challenge (test mode auto-resolves)", async () => {
+    const { status, json } = await post("/v1/auth/challenge", {
       telegram_user_id: TELEGRAM_USER_ID,
     });
     expect(status).toBe(201);
-    expect(json.status).toBe("pending");
-    expect(json.confirm_token).toBeDefined();
-    confirmToken = json.confirm_token;
+    expect(json.challenge_id).toBeDefined();
+    expect(json.expires_at).toBeDefined();
+    expect(json.deep_link).toBeNull(); // no bot configured in test mode
   });
 
-  it("POST /v1/users/confirm — activate user", async () => {
-    const { status, json } = await post("/v1/users/confirm", {
+  it("POST /v1/auth/verify — get session token", async () => {
+    // First create a challenge (auto-resolved in test mode)
+    const challenge = await post("/v1/auth/challenge", {
       telegram_user_id: TELEGRAM_USER_ID,
-      confirm_token: confirmToken,
     });
-    expect(status).toBe(200);
-    expect(json.status).toBe("active");
-  });
+    expect(challenge.status).toBe(201);
 
-  it("POST /v1/sessions — get session token", async () => {
-    const { status, json } = await post("/v1/sessions", {
-      telegram_user_id: TELEGRAM_USER_ID,
+    const { status, json } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
     });
     expect(status).toBe(200);
     expect(json.token).toBeDefined();
     expect(json.expires_in).toBeGreaterThan(0);
+    expect(json.user).toBeDefined();
+    expect(json.user.telegram_user_id).toBe(TELEGRAM_USER_ID);
+    expect(json.user.status).toBe("active");
     sessionToken = json.token;
+  });
+
+  it("POST /v1/auth/verify — unresolved challenge returns 202", async () => {
+    // Create challenge without telegram_user_id (won't auto-resolve)
+    const challenge = await post("/v1/auth/challenge", {});
+    expect(challenge.status).toBe(201);
+
+    const { status } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
+    });
+    expect(status).toBe(202);
   });
 
   it("POST /v1/wallets — create wallet", async () => {
@@ -211,7 +219,6 @@ describe("Full user journey", () => {
   });
 
   it("POST /v1/wallets/:id/sign — replay ticket returns 409", async () => {
-    // Reuse the same ticket — should be rejected
     const { status, json } = await post(
       `/v1/wallets/${walletId}/sign`,
       { digest, ticket },
@@ -227,7 +234,6 @@ describe("Full user journey", () => {
     expect(json.items.length).toBeGreaterThanOrEqual(4);
     const actions = json.items.map((e: { action: string }) => e.action);
     expect(actions).toContain("user.create");
-    expect(actions).toContain("user.confirm");
     expect(actions).toContain("session.create");
     expect(actions).toContain("wallet.create");
     expect(actions).toContain("wallet.sign");

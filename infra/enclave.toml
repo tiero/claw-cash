@@ -16,7 +16,8 @@ path = "/health"
 port = 7000
 
 [egress]
-enabled = false
+enabled = true
+destinations = ["arkade.computer"]
 
 [scaling]
 desired_replicas = 1

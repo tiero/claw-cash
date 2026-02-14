@@ -9,6 +9,8 @@ import { SlidingWindowRateLimiter } from "./rateLimit.js";
 import { InMemoryStore } from "./store.js";
 import type { SessionClaims, SupportedAlg, Wallet } from "./types.js";
 import {
+  arkadeOffboardSchema,
+  arkadeSendSchema,
   confirmUserSchema,
   createSessionSchema,
   createUserSchema,
@@ -345,6 +347,115 @@ app.delete("/v1/wallets/:id", requireAuth, async (req: Request, res, next) => {
       metadata: { reason: "user-request" }
     });
     res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// --- Arkade wallet routes ---
+
+app.post("/v1/arkade/init", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    enforceRateLimit(`user:${user.id}:arkade`, config.rateLimitPerUser);
+    const result = await enclaveClient.arkadeInit(user.id);
+    store.addAuditEvent({
+      user_id: user.id,
+      wallet_id: null,
+      action: "arkade.init",
+      metadata: { address: result.address }
+    });
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/v1/arkade/address", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    const result = await enclaveClient.arkadeAddress(user.id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/v1/arkade/balance", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    const result = await enclaveClient.arkadeBalance(user.id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/arkade/send", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    enforceRateLimit(`user:${user.id}:arkade_send`, config.rateLimitPerWalletSign);
+    const body = parse(arkadeSendSchema, req.body);
+    const result = await enclaveClient.arkadeSend(user.id, body.address, body.amount);
+    store.addAuditEvent({
+      user_id: user.id,
+      wallet_id: null,
+      action: "arkade.send",
+      metadata: { address: body.address, amount: body.amount, txid: result.txid }
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/arkade/onboard", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    enforceRateLimit(`user:${user.id}:arkade_onboard`, config.rateLimitPerUser);
+    const result = await enclaveClient.arkadeOnboard(user.id);
+    store.addAuditEvent({
+      user_id: user.id,
+      wallet_id: null,
+      action: "arkade.onboard",
+      metadata: { txid: result.txid }
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/arkade/offboard", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    enforceRateLimit(`user:${user.id}:arkade_offboard`, config.rateLimitPerUser);
+    const body = parse(arkadeOffboardSchema, req.body);
+    const result = await enclaveClient.arkadeOffboard(user.id, body.address, body.amount);
+    store.addAuditEvent({
+      user_id: user.id,
+      wallet_id: null,
+      action: "arkade.offboard",
+      metadata: { address: body.address, amount: body.amount, txid: result.txid }
+    });
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get("/v1/arkade/history", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    const result = await enclaveClient.arkadeHistory(user.id);
+    res.json(result);
   } catch (error) {
     next(error);
   }

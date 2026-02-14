@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@arkade-os/sdk": "^0.3.13",
     "@noble/secp256k1": "3.0.0",
     "express": "5.2.1",
     "jose": "^6.1.3",

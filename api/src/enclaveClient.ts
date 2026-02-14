@@ -17,6 +17,38 @@ interface ExportKeyResponse {
   private_key: string;
 }
 
+interface ArkadeInitResponse {
+  address: string;
+}
+
+interface ArkadeAddressResponse {
+  ark_address: string;
+  boarding_address: string;
+}
+
+interface ArkadeBalanceResponse {
+  boarding: { confirmed: number; unconfirmed: number; total: number };
+  settled: number;
+  preconfirmed: number;
+  available: number;
+  recoverable: number;
+  total: number;
+}
+
+interface ArkadeTxidResponse {
+  txid: string;
+}
+
+interface ArkadeHistoryResponse {
+  transactions: Array<{
+    key: { boardingTxid: string; commitmentTxid: string; arkTxid: string };
+    type: string;
+    amount: number;
+    settled: boolean;
+    createdAt: number;
+  }>;
+}
+
 type JsonMap = Record<string, unknown>;
 
 export class EnclaveClient {
@@ -59,6 +91,40 @@ export class EnclaveClient {
       alg,
       private_key: privateKey
     });
+  }
+
+  // --- Arkade wallet methods ---
+
+  async arkadeInit(userId: string): Promise<ArkadeInitResponse> {
+    return this.request<ArkadeInitResponse>("/internal/arkade/init", { user_id: userId });
+  }
+
+  async arkadeAddress(userId: string): Promise<ArkadeAddressResponse> {
+    return this.request<ArkadeAddressResponse>("/internal/arkade/address", { user_id: userId });
+  }
+
+  async arkadeBalance(userId: string): Promise<ArkadeBalanceResponse> {
+    return this.request<ArkadeBalanceResponse>("/internal/arkade/balance", { user_id: userId });
+  }
+
+  async arkadeSend(userId: string, address: string, amount: number): Promise<ArkadeTxidResponse> {
+    return this.request<ArkadeTxidResponse>("/internal/arkade/send", { user_id: userId, address, amount });
+  }
+
+  async arkadeOnboard(userId: string): Promise<ArkadeTxidResponse> {
+    return this.request<ArkadeTxidResponse>("/internal/arkade/onboard", { user_id: userId });
+  }
+
+  async arkadeOffboard(userId: string, address: string, amount?: number): Promise<ArkadeTxidResponse> {
+    return this.request<ArkadeTxidResponse>("/internal/arkade/offboard", { user_id: userId, address, amount });
+  }
+
+  async arkadeHistory(userId: string): Promise<ArkadeHistoryResponse> {
+    return this.request<ArkadeHistoryResponse>("/internal/arkade/history", { user_id: userId });
+  }
+
+  async arkadeDestroy(userId: string): Promise<{ ok: true }> {
+    return this.request<{ ok: true }>("/internal/arkade/destroy", { user_id: userId });
   }
 
   private async request<T>(path: string, body: JsonMap): Promise<T> {

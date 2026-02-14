@@ -30,7 +30,7 @@ export interface AuditEvent {
   id: string;
   user_id: string;
   wallet_id: string | null;
-  action: "user.create" | "user.confirm" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy";
+  action: "user.create" | "user.confirm" | "session.create" | "wallet.create" | "wallet.sign" | "wallet.destroy" | "arkade.init" | "arkade.send" | "arkade.onboard" | "arkade.offboard";
   metadata: Record<string, unknown>;
   created_at: string;
 }

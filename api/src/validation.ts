@@ -40,3 +40,13 @@ export const paginationSchema = z.object({
   limit: z.coerce.number().min(1).max(200).default(50),
   offset: z.coerce.number().min(0).default(0)
 });
+
+export const arkadeSendSchema = z.object({
+  address: z.string().min(1),
+  amount: z.number().int().positive()
+});
+
+export const arkadeOffboardSchema = z.object({
+  address: z.string().min(1),
+  amount: z.number().int().positive().optional()
+});

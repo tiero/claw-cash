@@ -16,8 +16,10 @@ hashes.sha256 = (...msgs: Uint8Array[]): Uint8Array => {
 import { errors, jwtVerify } from "jose";
 import { z } from "zod";
 import { config } from "./config.js";
+import { ArkadeWalletManager, WalletNotFoundError } from "./arkadeWallet.js";
 
 const ticketSecret = new TextEncoder().encode(config.ticketSigningSecret);
+const arkadeManager = new ArkadeWalletManager(config.arkServerUrl);
 
 type SupportedAlg = "secp256k1";
 
@@ -194,6 +196,112 @@ app.post("/internal/backup/export", (req, res, next) => {
   }
 });
 
+// --- Arkade wallet schemas ---
+
+const arkadeUserSchema = z.object({
+  user_id: z.string().min(1)
+});
+
+const arkadeSendSchema = z.object({
+  user_id: z.string().min(1),
+  address: z.string().min(1),
+  amount: z.number().int().positive()
+});
+
+const arkadeOffboardSchema = z.object({
+  user_id: z.string().min(1),
+  address: z.string().min(1),
+  amount: z.number().int().positive().optional()
+});
+
+// --- Arkade wallet endpoints ---
+
+app.post("/internal/arkade/init", async (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const result = await arkadeManager.init(body.user_id);
+    res.status(201).json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/address", async (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const result = await arkadeManager.getAddresses(body.user_id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/balance", async (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const result = await arkadeManager.getBalance(body.user_id);
+    res.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/send", async (req, res, next) => {
+  try {
+    const body = arkadeSendSchema.parse(req.body);
+    const txid = await arkadeManager.sendBitcoin(body.user_id, {
+      address: body.address,
+      amount: body.amount
+    });
+    res.json({ txid });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/onboard", async (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const txid = await arkadeManager.onboard(body.user_id);
+    res.json({ txid });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/offboard", async (req, res, next) => {
+  try {
+    const body = arkadeOffboardSchema.parse(req.body);
+    const txid = await arkadeManager.offboard(body.user_id, body.address, body.amount);
+    res.json({ txid });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/history", async (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const history = await arkadeManager.getHistory(body.user_id);
+    res.json({ transactions: history });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/internal/arkade/destroy", (req, res, next) => {
+  try {
+    const body = arkadeUserSchema.parse(req.body);
+    const deleted = arkadeManager.destroy(body.user_id);
+    if (!deleted) {
+      throw new ApiError(404, "Arkade wallet not found");
+    }
+    res.json({ ok: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.post("/internal/backup/import", (req, res, next) => {
   try {
     const body = importSchema.parse(req.body);
@@ -218,6 +326,10 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   }
   if (error instanceof errors.JWSSignatureVerificationFailed || error instanceof errors.JWTExpired || error instanceof errors.JWTClaimValidationFailed) {
     res.status(401).json({ error: "Invalid ticket signature or expiry" });
+    return;
+  }
+  if (error instanceof WalletNotFoundError) {
+    res.status(404).json({ error: error.message });
     return;
   }
   if (error instanceof ApiError) {

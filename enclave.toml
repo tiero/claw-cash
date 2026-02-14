@@ -12,7 +12,8 @@ forward_proxy_protocol = false
 trusted_headers = []
 
 [egress]
-enabled = false
+enabled = true
+destinations = ["arkade.computer"]
 
 [signing]
 certPath = "./cert.pem"

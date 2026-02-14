@@ -45,6 +45,9 @@ importers:
 
   enclave:
     dependencies:
+      '@arkade-os/sdk':
+        specifier: ^0.3.13
+        version: 0.3.13
       '@noble/secp256k1':
         specifier: 3.0.0
         version: 3.0.0
@@ -72,6 +75,10 @@ importers:
         version: 5.9.3
 
 packages:
+
+  '@arkade-os/sdk@0.3.13':
+    resolution: {integrity: sha512-eC6XGifqVf2Xu+sf/3T2duUgLiXlgh/IQXHD+v09wsu8ik/CZedH4gvQpetTjRMKti3DdY/QVLC1OQTKKWgvqQ==}
+    engines: {node: '>=20.0.0'}
 
   '@esbuild/aix-ppc64@0.27.3':
     resolution: {integrity: sha512-9fJMTNFTWZMh5qwrBItuziu834eOCUcEqymSH7pY+zoMVEZg3gcPuBNxH1EvfVYe9h0x/Ptw8KBzv7qxb7l8dg==}
@@ -232,6 +239,23 @@ packages:
   '@jridgewell/sourcemap-codec@1.5.5':
     resolution: {integrity: sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og==}
 
+  '@marcbachmann/cel-js@7.3.1':
+    resolution: {integrity: sha512-P6o26TvjStT8V8+8EF+yq9Pp7ZFV00bpiUMbssr76XbIZGxaB+NNWeBp6WNxOrR9gp0JPzvJueCKHpOs5LE9PQ==}
+    engines: {node: '>=20.19.0'}
+    hasBin: true
+
+  '@noble/curves@2.0.0':
+    resolution: {integrity: sha512-RiwZZeJnsTnhT+/gg2KvITJZhK5oagQrpZo+yQyd3mv3D5NAG2qEeEHpw7IkXRlpkoD45wl2o4ydHAvY9wyEfw==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.0.0':
+    resolution: {integrity: sha512-h8VUBlE8R42+XIDO229cgisD287im3kdY6nbNZJFjc6ZvKIXPYXe6Vc/t+kyjFdMFyt5JpapzTsEg8n63w5/lw==}
+    engines: {node: '>= 20.19.0'}
+
+  '@noble/hashes@2.0.1':
+    resolution: {integrity: sha512-XlOlEbQcE9fmuXxrVTXCTlG2nlRXa9Rj3rr5Ue/+tX+nmkgbX720YHh0VR3hBF9xDvwnb8D2shVGOwNx+ulArw==}
+    engines: {node: '>= 20.19.0'}
+
   '@noble/secp256k1@3.0.0':
     resolution: {integrity: sha512-NJBaR352KyIvj3t6sgT/+7xrNyF9Xk9QlLSIqUGVUYlsnDTAUqY8LOmwpcgEx4AMJXRITQ5XEVHD+mMaPfr3mg==}
 
@@ -360,6 +384,12 @@ packages:
     cpu: [x64]
     os: [win32]
 
+  '@scure/base@2.0.0':
+    resolution: {integrity: sha512-3E1kpuZginKkek01ovG8krQ0Z44E3DHPjc5S2rjJw9lZn3KSQOs8S7wqikF/AH7iRanHypj85uGyxk0XAyC37w==}
+
+  '@scure/btc-signer@2.0.1':
+    resolution: {integrity: sha512-vk5a/16BbSFZkhh1JIJ0+4H9nceZVo5WzKvJGGWiPp3sQOExeW+L53z3dI6u0adTPoE8ZbL+XEb6hEGzVZSvvQ==}
+
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
@@ -457,6 +487,10 @@ packages:
   assertion-error@2.0.1:
     resolution: {integrity: sha512-Izi8RQcffqCeNVgFigKli1ssklIbpHnCYc6AknXGYoB6grJqyeby7jv12JUQgmTAnIDnbck1uxksT4dzN3PWBA==}
     engines: {node: '>=12'}
+
+  bip68@1.0.4:
+    resolution: {integrity: sha512-O1htyufFTYy3EO0JkHg2CLykdXEtV2ssqw47Gq9A0WByp662xpJnMEB9m43LZjsSDjIAOozWRExlFQk2hlV1XQ==}
+    engines: {node: '>=4.5.0'}
 
   body-parser@1.20.4:
     resolution: {integrity: sha512-ZTgYYLMOXY9qKU/57FAo8F+HA2dGX7bqGc71txDRC1rS4frdFI5R7NhluHxH6M0YItAP0sHB4uqAOcYKxO6uGA==}
@@ -730,6 +764,10 @@ packages:
   methods@1.1.2:
     resolution: {integrity: sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==}
     engines: {node: '>= 0.6'}
+
+  micro-packed@0.8.0:
+    resolution: {integrity: sha512-AKb8znIvg9sooythbXzyFeChEY0SkW0C6iXECpy/ls0e5BtwXO45J9wD9SLzBztnS4XmF/5kwZknsq+jyynd/A==}
+    engines: {node: '>= 20.19.0'}
 
   mime-db@1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
@@ -1050,6 +1088,15 @@ packages:
 
 snapshots:
 
+  '@arkade-os/sdk@0.3.13':
+    dependencies:
+      '@marcbachmann/cel-js': 7.3.1
+      '@noble/curves': 2.0.0
+      '@noble/secp256k1': 3.0.0
+      '@scure/base': 2.0.0
+      '@scure/btc-signer': 2.0.1
+      bip68: 1.0.4
+
   '@esbuild/aix-ppc64@0.27.3':
     optional: true
 
@@ -1130,6 +1177,16 @@ snapshots:
 
   '@jridgewell/sourcemap-codec@1.5.5': {}
 
+  '@marcbachmann/cel-js@7.3.1': {}
+
+  '@noble/curves@2.0.0':
+    dependencies:
+      '@noble/hashes': 2.0.0
+
+  '@noble/hashes@2.0.0': {}
+
+  '@noble/hashes@2.0.1': {}
+
   '@noble/secp256k1@3.0.0': {}
 
   '@rollup/rollup-android-arm-eabi@4.57.1':
@@ -1206,6 +1263,15 @@ snapshots:
 
   '@rollup/rollup-win32-x64-msvc@4.57.1':
     optional: true
+
+  '@scure/base@2.0.0': {}
+
+  '@scure/btc-signer@2.0.1':
+    dependencies:
+      '@noble/curves': 2.0.0
+      '@noble/hashes': 2.0.1
+      '@scure/base': 2.0.0
+      micro-packed: 0.8.0
 
   '@standard-schema/spec@1.1.0': {}
 
@@ -1327,6 +1393,8 @@ snapshots:
   array-flatten@1.1.1: {}
 
   assertion-error@2.0.1: {}
+
+  bip68@1.0.4: {}
 
   body-parser@1.20.4:
     dependencies:
@@ -1678,6 +1746,10 @@ snapshots:
   merge-descriptors@2.0.0: {}
 
   methods@1.1.2: {}
+
+  micro-packed@0.8.0:
+    dependencies:
+      '@scure/base': 2.0.0
 
   mime-db@1.52.0: {}
 

@@ -28,6 +28,15 @@ export const signSchema = z.object({
   ticket: z.string().min(32).max(4096)
 });
 
+export const signBatchSchema = z.object({
+  digests: z.array(
+    z.object({
+      digest: z.string().regex(digestPattern),
+      scope: z.literal("sign").optional()
+    })
+  ).min(1).max(100)
+});
+
 export const paginationSchema = z.object({
   limit: z.coerce.number().min(1).max(200).default(50),
   offset: z.coerce.number().min(0).default(0)

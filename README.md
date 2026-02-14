@@ -26,9 +26,7 @@ Agent ──► clw.cash API ──► Enclave (signs with secp256k1)
 
 ## TODO
 
-- [ ] Integrate `@arkade-os/skill` for Bitcoin transactions (send, receive, UTXO management)
-- [ ] Integrate `@arkade-os/skill` for stablecoin support (USDT/USDC on Liquid Network)
-- [ ] Multi-chain address derivation from enclave-held keys
+- [ ] Integrate `@arkade-os/skill` for Bitcoin transactions (send, receive, swap)
 - [ ] Agent SDK — TypeScript client for AI agent frameworks (Vercel AI SDK, LangChain, etc.)
 - [ ] MCP server for Claude Code / Claude Desktop tool-use integration
 - [ ] Spending policies — per-agent limits, allowlists, time-based rules

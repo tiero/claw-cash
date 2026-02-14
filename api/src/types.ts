@@ -38,7 +38,7 @@ export interface AuditEvent {
 export interface KeyBackup {
   identity_id: string;
   alg: SupportedAlg;
-  private_key: string;
+  sealed_key: string;
   created_at: string;
   updated_at: string;
 }

@@ -1,9 +1,1 @@
-{
-  "bcc07d78-956c-4aed-8a34-4a644187fb76": {
-    "identity_id": "bcc07d78-956c-4aed-8a34-4a644187fb76",
-    "alg": "secp256k1",
-    "private_key": "20cc25954e6c780882d62a2dcf027e90b1c90ddba81f35d39447370718e6ddb2",
-    "created_at": "2026-02-14T01:36:15.785Z",
-    "updated_at": "2026-02-14T01:36:15.785Z"
-  }
-}
+{}

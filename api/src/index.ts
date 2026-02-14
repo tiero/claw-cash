@@ -85,7 +85,7 @@ const restoreFromBackupIfAvailable = async (identityId: string): Promise<boolean
   if (!backup) {
     return false;
   }
-  await enclaveClient.importKey(identityId, backup.alg, backup.private_key);
+  await enclaveClient.importKey(identityId, backup.alg, backup.sealed_key);
   return true;
 };
 
@@ -182,7 +182,7 @@ app.post("/v1/identities", requireAuth, async (req: Request, res, next) => {
     store.putBackup({
       identity_id: identityId,
       alg: exported.alg,
-      private_key: exported.private_key
+      sealed_key: exported.sealed_key
     });
     const identity = store.createIdentity({
       id: identityId,

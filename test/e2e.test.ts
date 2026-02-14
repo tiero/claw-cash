@@ -258,6 +258,125 @@ describe("Full user journey", () => {
   });
 });
 
+describe("Sealed backup export / import", () => {
+  let sessionToken: string;
+  let identityId: string;
+
+  it("setup: authenticate", async () => {
+    const challenge = await post("/v1/auth/challenge", {
+      telegram_user_id: "seal_test_user_" + Date.now(),
+    });
+    const { json } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
+    });
+    sessionToken = json.token;
+  });
+
+  it("backup file contains sealed_key, not private_key", async () => {
+    const { json } = await post(
+      "/v1/identities",
+      { alg: "secp256k1" },
+      sessionToken
+    );
+    identityId = json.id;
+
+    // Read the backup file and verify shape
+    const { readFileSync } = await import("node:fs");
+    const raw = readFileSync(env.BACKUP_FILE_PATH!, "utf-8");
+    const backups = JSON.parse(raw);
+    const backup = backups[identityId];
+
+    expect(backup).toBeDefined();
+    expect(backup.sealed_key).toBeDefined();
+    expect(typeof backup.sealed_key).toBe("string");
+    expect(backup.sealed_key.length).toBeGreaterThan(0);
+    // Must NOT contain a raw 64-char hex private key
+    expect(backup).not.toHaveProperty("private_key");
+    // Sealed key should be in AES format (iv:ciphertext:tag) for local dev
+    expect(backup.sealed_key.split(":").length).toBe(3);
+  });
+
+  it("backup restore works: sign after enclave key is destroyed internally", async () => {
+    // Destroy key directly in enclave (simulates enclave restart)
+    const destroyRes = await fetch(`${ENCLAVE_BASE}/internal/destroy`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-api-key": INTERNAL_API_KEY,
+      },
+      body: JSON.stringify({ identity_id: identityId }),
+    });
+    expect(destroyRes.status).toBe(200);
+
+    // Now sign through the API — should auto-restore from sealed backup
+    const digest = randomBytes(32).toString("hex");
+    const intentRes = await post(
+      `/v1/identities/${identityId}/sign-intent`,
+      { digest, scope: "sign" },
+      sessionToken
+    );
+    expect(intentRes.status).toBe(201);
+
+    const signRes = await post(
+      `/v1/identities/${identityId}/sign`,
+      { digest, ticket: intentRes.json.ticket },
+      sessionToken
+    );
+    expect(signRes.status).toBe(200);
+    expect(signRes.json.signature).toBeDefined();
+  });
+
+  it("tampered sealed_key fails import", async () => {
+    // Destroy key in enclave first
+    await fetch(`${ENCLAVE_BASE}/internal/destroy`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-api-key": INTERNAL_API_KEY,
+      },
+      body: JSON.stringify({ identity_id: identityId }),
+    });
+
+    // Try importing a tampered sealed key directly
+    const importRes = await fetch(`${ENCLAVE_BASE}/internal/backup/import`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-api-key": INTERNAL_API_KEY,
+      },
+      body: JSON.stringify({
+        identity_id: identityId,
+        alg: "secp256k1",
+        sealed_key: "aaaa:bbbb:cccc",
+      }),
+    });
+    expect(importRes.status).toBe(500);
+  });
+
+  it("cleanup: destroy identity", async () => {
+    // Restore key first so destroy works
+    const { readFileSync } = await import("node:fs");
+    const raw = readFileSync(env.BACKUP_FILE_PATH!, "utf-8");
+    const backups = JSON.parse(raw);
+    const backup = backups[identityId];
+    if (backup) {
+      await fetch(`${ENCLAVE_BASE}/internal/backup/import`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-internal-api-key": INTERNAL_API_KEY,
+        },
+        body: JSON.stringify({
+          identity_id: identityId,
+          alg: backup.alg,
+          sealed_key: backup.sealed_key,
+        }),
+      });
+    }
+    await del(`/v1/identities/${identityId}`, sessionToken);
+  });
+});
+
 describe("Auth guards", () => {
   it("POST /v1/identities without token returns 401", async () => {
     const { status } = await post("/v1/identities", { alg: "secp256k1" });

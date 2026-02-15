@@ -1,7 +1,7 @@
 import {
   Client,
-  InMemoryWalletStorage,
-  InMemorySwapStorage,
+  IdbWalletStorage,
+  IdbSwapStorage,
 } from "@lendasat/lendaswap-sdk-pure";
 import type { PaymentParams } from "./params.js";
 import { TOKEN_DECIMALS } from "./params.js";
@@ -11,12 +11,15 @@ let client: Client | null = null;
 async function getClient(): Promise<Client> {
   if (client) return client;
   client = await Client.builder()
-    .withSignerStorage(new InMemoryWalletStorage())
-    .withSwapStorage(new InMemorySwapStorage())
+    .withSignerStorage(new IdbWalletStorage())
+    .withSwapStorage(new IdbSwapStorage())
     .build();
   return client;
 }
 
+/**
+ * Create a new swap (legacy flow — only used when swapId is not provided).
+ */
 export async function createSwap(params: PaymentParams, userAddress: string) {
   const c = await getClient();
   const result = await c.createEvmToArkadeSwap({

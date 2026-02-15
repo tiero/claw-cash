@@ -12,11 +12,11 @@ export async function handleLogin(): Promise<never> {
     return outputError("Not initialized. Run 'cash init' first.");
   }
 
-  // Step 1: Request a challenge (send telegram_user_id for test mode auto-resolve)
+  // Step 1: Request a challenge
   const challengeRes = await fetch(`${config.apiBaseUrl}/v1/auth/challenge`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ telegram_user_id: "test_user" }),
+    body: JSON.stringify({}),
   });
 
   if (!challengeRes.ok) {

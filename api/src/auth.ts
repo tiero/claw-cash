@@ -1,29 +1,46 @@
-import jwt from "jsonwebtoken";
-import { config } from "./config.js";
+import { SignJWT, jwtVerify } from "jose";
 import type { SessionClaims, TicketClaims } from "./types.js";
 
-export const signSessionToken = (claims: SessionClaims): string => {
-  return jwt.sign(claims, config.sessionSigningSecret, {
-    algorithm: "HS256",
-    expiresIn: config.sessionTtlSeconds
+const encoder = new TextEncoder();
+
+export const signSessionToken = async (
+  claims: SessionClaims,
+  secret: string,
+  ttlSeconds: number,
+): Promise<string> => {
+  return new SignJWT(claims as unknown as Record<string, unknown>)
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime(`${ttlSeconds}s`)
+    .sign(encoder.encode(secret));
+};
+
+export const verifySessionToken = async (
+  token: string,
+  secret: string,
+): Promise<SessionClaims> => {
+  const { payload } = await jwtVerify(token, encoder.encode(secret), {
+    algorithms: ["HS256"],
   });
+  return payload as unknown as SessionClaims;
 };
 
-export const verifySessionToken = (token: string): SessionClaims => {
-  return jwt.verify(token, config.sessionSigningSecret, {
-    algorithms: ["HS256"]
-  }) as SessionClaims;
+export const signTicketToken = async (
+  claims: TicketClaims,
+  secret: string,
+  ttlSeconds: number,
+): Promise<string> => {
+  return new SignJWT(claims as unknown as Record<string, unknown>)
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime(`${ttlSeconds}s`)
+    .sign(encoder.encode(secret));
 };
 
-export const signTicketToken = (claims: TicketClaims): string => {
-  return jwt.sign(claims, config.ticketSigningSecret, {
-    algorithm: "HS256",
-    expiresIn: config.ticketTtlSeconds
+export const verifyTicketToken = async (
+  token: string,
+  secret: string,
+): Promise<TicketClaims> => {
+  const { payload } = await jwtVerify(token, encoder.encode(secret), {
+    algorithms: ["HS256"],
   });
-};
-
-export const verifyTicketToken = (token: string): TicketClaims => {
-  return jwt.verify(token, config.ticketSigningSecret, {
-    algorithms: ["HS256"]
-  }) as TicketClaims;
+  return payload as unknown as TicketClaims;
 };

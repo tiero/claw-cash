@@ -144,7 +144,8 @@ export async function parseParams(): Promise<PaymentParams> {
   // New short URL: /pay?id=<swapId> — fetch everything from API proxy
   const id = url.searchParams.get("id");
   if (id) {
-    const resp = await fetch(`/v1/swaps/${encodeURIComponent(id)}`);
+    const apiUrl = import.meta.env.VITE_API_URL || "";
+    const resp = await fetch(`${apiUrl}/v1/swaps/${encodeURIComponent(id)}`);
     if (!resp.ok) {
       throw new Error(
         resp.status === 404

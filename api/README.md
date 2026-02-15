@@ -31,6 +31,27 @@ New users start with `status: "pending"` and must confirm before they can create
    → 200 { token, expires_in }  (only works for active users)
 ```
 
+## Agent Tips
+
+All endpoints return JSON. Use `curl` + `jq` to extract specific fields:
+
+```bash
+# Check if API is healthy
+curl -s https://api.clw.cash/health | jq .status
+
+# Create a user and extract confirm_token
+curl -s -X POST https://api.clw.cash/v1/users \
+  -H "Content-Type: application/json" \
+  -d '{"telegram_user_id": "123"}' | jq -r .confirm_token
+
+# Create a session and extract the JWT
+curl -s -X POST https://api.clw.cash/v1/sessions \
+  -H "Content-Type: application/json" \
+  -d '{"telegram_user_id": "123"}' | jq -r .token
+```
+
+Note: The CLI (`cash init`, `cash login`) handles the full auth flow automatically. Direct API calls are only needed for custom integrations.
+
 ## Local run
 
 ```bash

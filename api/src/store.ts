@@ -1,206 +1,189 @@
-import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
-import { v4 as uuidv4 } from "uuid";
 import type { AuditEvent, Challenge, Identity, KeyBackup, Ticket, User } from "./types.js";
 
-export class InMemoryStore {
-  private readonly usersById = new Map<string, User>();
-  private readonly usersByTelegramId = new Map<string, User>();
-  private readonly identitiesById = new Map<string, Identity>();
-  private readonly ticketsById = new Map<string, Ticket>();
-  private readonly auditEvents: AuditEvent[] = [];
-  private readonly backupsByIdentityId = new Map<string, KeyBackup>();
-  private readonly challengesById = new Map<string, Challenge>();
-  private readonly backupFilePath: string;
+export class CloudflareStore {
+  constructor(
+    private readonly db: D1Database,
+    private readonly kvChallenges: KVNamespace,
+    private readonly kvTickets: KVNamespace,
+    private readonly challengeTtlSeconds: number,
+  ) {}
 
-  constructor(backupFilePath: string) {
-    this.backupFilePath = backupFilePath;
-    this.loadBackupsFromDisk();
-  }
+  // ── Users ──────────────────────────────────────────────────
 
-  createOrGetUser(telegramUserId: string): { user: User; created: boolean } {
-    const existing = this.usersByTelegramId.get(telegramUserId);
-    if (existing) {
-      return { user: existing, created: false };
-    }
+  async createOrGetUser(telegramUserId: string): Promise<{ user: User; created: boolean }> {
+    const existing = await this.db
+      .prepare("SELECT * FROM users WHERE telegram_user_id = ?")
+      .bind(telegramUserId)
+      .first<User>();
+    if (existing) return { user: existing, created: false };
+
     const user: User = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       telegram_user_id: telegramUserId,
       status: "active",
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
-    this.usersById.set(user.id, user);
-    this.usersByTelegramId.set(user.telegram_user_id, user);
+    await this.db
+      .prepare("INSERT INTO users (id, telegram_user_id, status, created_at) VALUES (?, ?, ?, ?)")
+      .bind(user.id, user.telegram_user_id, user.status, user.created_at)
+      .run();
     return { user, created: true };
   }
 
-  getUserByTelegramId(telegramUserId: string): User | undefined {
-    return this.usersByTelegramId.get(telegramUserId);
+  async getUserById(userId: string): Promise<User | undefined> {
+    const row = await this.db.prepare("SELECT * FROM users WHERE id = ?").bind(userId).first<User>();
+    return row ?? undefined;
   }
 
-  getUserById(userId: string): User | undefined {
-    return this.usersById.get(userId);
-  }
+  // ── Identities ─────────────────────────────────────────────
 
-  createIdentity(input: Omit<Identity, "created_at" | "status">): Identity {
+  async createIdentity(input: Omit<Identity, "created_at" | "status">): Promise<Identity> {
     const identity: Identity = {
       ...input,
       status: "active",
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
     };
-    this.identitiesById.set(identity.id, identity);
+    await this.db
+      .prepare("INSERT INTO identities (id, user_id, alg, public_key, status, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(identity.id, identity.user_id, identity.alg, identity.public_key, identity.status, identity.created_at)
+      .run();
     return identity;
   }
 
-  getIdentity(identityId: string): Identity | undefined {
-    return this.identitiesById.get(identityId);
+  async getIdentity(identityId: string): Promise<Identity | undefined> {
+    const row = await this.db.prepare("SELECT * FROM identities WHERE id = ?").bind(identityId).first<Identity>();
+    return row ?? undefined;
   }
 
-  listIdentitiesByUser(userId: string): Identity[] {
-    return [...this.identitiesById.values()].filter((identity) => identity.user_id === userId);
+  async markIdentityDestroyed(identityId: string): Promise<void> {
+    await this.db.prepare("UPDATE identities SET status = 'destroyed' WHERE id = ?").bind(identityId).run();
   }
 
-  markIdentityDestroyed(identityId: string): void {
-    const identity = this.identitiesById.get(identityId);
-    if (!identity) {
-      return;
-    }
-    identity.status = "destroyed";
-    this.identitiesById.set(identityId, identity);
-  }
+  // ── Tickets (KV with TTL) ──────────────────────────────────
 
-  createTicket(input: Omit<Ticket, "used_at">): Ticket {
+  async createTicket(input: Omit<Ticket, "used_at">, ttlSeconds: number): Promise<Ticket> {
     const ticket: Ticket = { ...input, used_at: null };
-    this.ticketsById.set(ticket.id, ticket);
+    await this.kvTickets.put(ticket.id, JSON.stringify(ticket), { expirationTtl: ttlSeconds });
     return ticket;
   }
 
-  getTicket(ticketId: string): Ticket | undefined {
-    return this.ticketsById.get(ticketId);
+  async getTicket(ticketId: string): Promise<Ticket | undefined> {
+    const raw = await this.kvTickets.get(ticketId);
+    if (!raw) return undefined;
+    return JSON.parse(raw) as Ticket;
   }
 
-  markTicketUsed(ticketId: string): void {
-    const ticket = this.ticketsById.get(ticketId);
-    if (!ticket) {
-      return;
-    }
+  async markTicketUsed(ticketId: string): Promise<void> {
+    const ticket = await this.getTicket(ticketId);
+    if (!ticket) return;
     ticket.used_at = new Date().toISOString();
-    this.ticketsById.set(ticketId, ticket);
+    // Keep in KV so replays are rejected until natural expiry
+    await this.kvTickets.put(ticketId, JSON.stringify(ticket));
   }
 
-  addAuditEvent(event: Omit<AuditEvent, "id" | "created_at">): AuditEvent {
-    const auditEvent: AuditEvent = {
-      ...event,
-      id: uuidv4(),
-      created_at: new Date().toISOString()
-    };
-    this.auditEvents.push(auditEvent);
-    return auditEvent;
-  }
+  // ── Challenges (KV with TTL) ───────────────────────────────
 
-  listAuditEventsForUser(userId: string, limit: number, offset: number): AuditEvent[] {
-    return this.auditEvents
-      .filter((event) => event.user_id === userId)
-      .slice(offset, offset + limit);
-  }
-
-  // ── Challenges ──────────────────────────────────────────
-
-  createChallenge(ttlSeconds: number): Challenge {
-    this.purgeExpiredChallenges();
+  async createChallenge(): Promise<Challenge> {
     const now = new Date();
     const challenge: Challenge = {
-      id: uuidv4(),
+      id: crypto.randomUUID(),
       telegram_user_id: null,
       created_at: now.toISOString(),
-      expires_at: new Date(now.getTime() + ttlSeconds * 1000).toISOString()
+      expires_at: new Date(now.getTime() + this.challengeTtlSeconds * 1000).toISOString(),
     };
-    this.challengesById.set(challenge.id, challenge);
+    await this.kvChallenges.put(challenge.id, JSON.stringify(challenge), {
+      expirationTtl: this.challengeTtlSeconds,
+    });
     return challenge;
   }
 
-  getChallenge(challengeId: string): Challenge | undefined {
-    const challenge = this.challengesById.get(challengeId);
-    if (!challenge) {
-      return undefined;
-    }
-    if (new Date(challenge.expires_at).getTime() <= Date.now()) {
-      this.challengesById.delete(challengeId);
-      return undefined;
-    }
-    return challenge;
+  async getChallenge(challengeId: string): Promise<Challenge | undefined> {
+    const raw = await this.kvChallenges.get(challengeId);
+    if (!raw) return undefined;
+    return JSON.parse(raw) as Challenge;
   }
 
-  resolveChallenge(challengeId: string, telegramUserId: string): boolean {
-    const challenge = this.getChallenge(challengeId);
-    if (!challenge) {
-      return false;
-    }
-    if (challenge.telegram_user_id !== null) {
-      return false;
-    }
+  async resolveChallenge(challengeId: string, telegramUserId: string): Promise<boolean> {
+    const challenge = await this.getChallenge(challengeId);
+    if (!challenge || challenge.telegram_user_id !== null) return false;
     challenge.telegram_user_id = telegramUserId;
-    this.challengesById.set(challengeId, challenge);
+    await this.kvChallenges.put(challengeId, JSON.stringify(challenge));
     return true;
   }
 
-  private purgeExpiredChallenges(): void {
-    const now = Date.now();
-    for (const [id, challenge] of this.challengesById) {
-      if (new Date(challenge.expires_at).getTime() <= now) {
-        this.challengesById.delete(id);
-      }
-    }
+  // ── Audit Events ───────────────────────────────────────────
+
+  async addAuditEvent(event: Omit<AuditEvent, "id" | "created_at">): Promise<AuditEvent> {
+    const auditEvent: AuditEvent = {
+      ...event,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+    };
+    await this.db
+      .prepare("INSERT INTO audit_events (id, user_id, identity_id, action, metadata, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(auditEvent.id, auditEvent.user_id, auditEvent.identity_id, auditEvent.action, JSON.stringify(auditEvent.metadata), auditEvent.created_at)
+      .run();
+    return auditEvent;
   }
 
-  // ── Key Backups ─────────────────────────────────────────
+  async listAuditEventsForUser(userId: string, limit: number, offset: number): Promise<AuditEvent[]> {
+    const result = await this.db
+      .prepare("SELECT * FROM audit_events WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?")
+      .bind(userId, limit, offset)
+      .all<AuditEvent & { metadata: string }>();
+    return (result.results ?? []).map((row) => ({
+      ...row,
+      metadata: typeof row.metadata === "string" ? JSON.parse(row.metadata) : row.metadata,
+    }));
+  }
 
-  putBackup(backup: Omit<KeyBackup, "created_at" | "updated_at">): KeyBackup {
+  // ── Key Backups ────────────────────────────────────────────
+
+  async putBackup(backup: Omit<KeyBackup, "created_at" | "updated_at">): Promise<KeyBackup> {
     const now = new Date().toISOString();
-    const existing = this.backupsByIdentityId.get(backup.identity_id);
+    const existing = await this.getBackup(backup.identity_id);
     const next: KeyBackup = {
       ...backup,
       created_at: existing?.created_at ?? now,
-      updated_at: now
+      updated_at: now,
     };
-    this.backupsByIdentityId.set(next.identity_id, next);
-    this.persistBackupsToDisk();
+    await this.db
+      .prepare(
+        "INSERT INTO key_backups (identity_id, alg, sealed_key, created_at, updated_at) VALUES (?, ?, ?, ?, ?) ON CONFLICT(identity_id) DO UPDATE SET alg = excluded.alg, sealed_key = excluded.sealed_key, updated_at = excluded.updated_at",
+      )
+      .bind(next.identity_id, next.alg, next.sealed_key, next.created_at, next.updated_at)
+      .run();
     return next;
   }
 
-  getBackup(identityId: string): KeyBackup | undefined {
-    return this.backupsByIdentityId.get(identityId);
+  async getBackup(identityId: string): Promise<KeyBackup | undefined> {
+    const row = await this.db.prepare("SELECT * FROM key_backups WHERE identity_id = ?").bind(identityId).first<KeyBackup>();
+    return row ?? undefined;
   }
 
-  deleteBackup(identityId: string): void {
-    this.backupsByIdentityId.delete(identityId);
-    this.persistBackupsToDisk();
+  async deleteBackup(identityId: string): Promise<void> {
+    await this.db.prepare("DELETE FROM key_backups WHERE identity_id = ?").bind(identityId).run();
   }
 
-  static digestHash(digestHex: string): string {
-    return createHash("sha256").update(Buffer.from(digestHex, "hex")).digest("hex");
-  }
+  // ── Utilities ──────────────────────────────────────────────
 
-  private loadBackupsFromDisk(): void {
-    if (!existsSync(this.backupFilePath)) {
-      return;
-    }
-    try {
-      const raw = readFileSync(this.backupFilePath, "utf-8");
-      const parsed = JSON.parse(raw) as Record<string, KeyBackup>;
-      for (const [identityId, backup] of Object.entries(parsed)) {
-        this.backupsByIdentityId.set(identityId, backup);
-      }
-    } catch {
-      // Ignore malformed backup files in MVP mode.
-    }
+  static async digestHash(digestHex: string): Promise<string> {
+    const bytes = hexToBytes(digestHex);
+    const hash = await crypto.subtle.digest("SHA-256", bytes.buffer as ArrayBuffer);
+    return bytesToHex(new Uint8Array(hash));
   }
+}
 
-  private persistBackupsToDisk(): void {
-    const parent = dirname(this.backupFilePath);
-    mkdirSync(parent, { recursive: true });
-    const serializable = Object.fromEntries(this.backupsByIdentityId.entries());
-    writeFileSync(this.backupFilePath, JSON.stringify(serializable, null, 2), "utf-8");
+function hexToBytes(hex: string): Uint8Array {
+  const bytes = new Uint8Array(hex.length / 2);
+  for (let i = 0; i < bytes.length; i++) {
+    bytes[i] = parseInt(hex.slice(i * 2, i * 2 + 2), 16);
   }
+  return bytes;
+}
+
+function bytesToHex(bytes: Uint8Array): string {
+  return Array.from(bytes)
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }

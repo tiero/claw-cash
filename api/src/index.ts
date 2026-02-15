@@ -1,588 +1,429 @@
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import express, { type NextFunction, type Request, type Response } from "express";
-import jwt from "jsonwebtoken";
-import { v4 as uuidv4 } from "uuid";
+import { Hono } from "hono";
+import { cors } from "hono/cors";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
-import { config } from "./config.js";
+import type { Env } from "./bindings.js";
+import { CloudflareStore } from "./store.js";
+import { KVRateLimiter } from "./rateLimit.js";
 import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
-import { gracefulShutdown } from "@clw-cash/shared";
-import { SlidingWindowRateLimiter } from "./rateLimit.js";
-import { InMemoryStore } from "./store.js";
-import { TelegramBot } from "./telegramBot.js";
-import type { Identity, SessionClaims, SupportedAlg } from "./types.js";
+import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
 import {
-  botSessionSchema,
   challengeRequestSchema,
+  verifySchema,
   createIdentitySchema,
-  normalizeDigestHex,
-  paginationSchema,
-  signBatchSchema,
   signIntentSchema,
   signSchema,
-  verifySchema
+  signBatchSchema,
+  paginationSchema,
+  normalizeDigestHex,
 } from "./validation.js";
+import type { SessionClaims, SupportedAlg, Identity } from "./types.js";
 
-type AuthenticatedRequest = Request & { auth: SessionClaims };
+type HonoEnv = { Bindings: Env; Variables: { auth: SessionClaims } };
 
-const app = express();
-app.use(express.json({ limit: "32kb" }));
+const app = new Hono<HonoEnv>();
 
-// Serve payment page static files
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const webDistPath = process.env.WEB_DIST_PATH || path.resolve(__dirname, "../../web/dist");
-app.use("/pay", express.static(webDistPath));
+// ── CORS ──────────────────────────────────────────────────────
 
-const store = new InMemoryStore(config.backupFilePath);
-const enclaveClient = new EnclaveClient(config.enclaveBaseUrl, config.internalApiKey, config.evApiKey || undefined);
-const limiter = new SlidingWindowRateLimiter();
+app.use("/v1/*", async (c, next) => {
+  const allowedOrigins = c.env.ALLOWED_ORIGINS.split(",").map((s) => s.trim());
+  return cors({
+    origin: (origin) => {
+      if (allowedOrigins.includes(origin)) return origin;
+      // Allow Cloudflare Pages preview deployments
+      if (/\.pages\.dev$/.test(origin)) return origin;
+      return "";
+    },
+    allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowHeaders: ["Content-Type", "Authorization"],
+  })(c, next);
+});
 
-const LENDASWAP_API = "https://apilendaswap.lendasat.com";
+// ── Helpers ───────────────────────────────────────────────────
 
-const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
-  const authHeader = req.header("authorization") ?? "";
-  if (!authHeader.startsWith("Bearer ")) {
-    res.status(401).json({ error: "Missing bearer token" });
-    return;
-  }
-  const token = authHeader.slice("Bearer ".length);
-  try {
-    const claims = verifySessionToken(token);
-    (req as AuthenticatedRequest).auth = claims;
-    next();
-  } catch {
-    res.status(401).json({ error: "Invalid session token" });
-  }
-};
+function getStore(env: Env): CloudflareStore {
+  return new CloudflareStore(env.DB, env.KV_CHALLENGES, env.KV_TICKETS, parseInt(env.CHALLENGE_TTL_SECONDS, 10));
+}
 
-const parse = <T extends z.ZodTypeAny>(schema: T, source: unknown): z.output<T> => {
-  return schema.parse(source);
-};
+function getLimiter(env: Env): KVRateLimiter {
+  return new KVRateLimiter(env.KV_RATE_LIMIT);
+}
 
-const parsePagination = (req: Request): { limit: number; offset: number } => {
-  return parse(paginationSchema, req.query);
-};
+function getEnclave(env: Env): EnclaveClient {
+  return new EnclaveClient(env.ENCLAVE_BASE_URL, env.INTERNAL_API_KEY, env.EV_API_KEY || undefined);
+}
 
-const currentUserFromRequest = (req: AuthenticatedRequest): { id: string; telegram_user_id: string } => {
-  const user = store.getUserById(req.auth.sub);
-  if (!user) {
-    throw new ApiError(401, "Session user no longer exists");
-  }
+async function currentUser(store: CloudflareStore, userId: string) {
+  const user = await store.getUserById(userId);
+  if (!user) throw new HTTPException(401, { message: "Session user no longer exists" });
   return { id: user.id, telegram_user_id: user.telegram_user_id };
-};
+}
 
-const requireOwnedActiveIdentity = (identityId: string, userId: string): Identity => {
-  const identity = store.getIdentity(identityId);
-  if (!identity) {
-    throw new ApiError(404, "Identity not found");
-  }
-  if (identity.user_id !== userId) {
-    throw new ApiError(403, "Identity does not belong to session user");
-  }
-  if (identity.status !== "active") {
-    throw new ApiError(409, "Identity is not active");
-  }
+async function ownedActiveIdentity(store: CloudflareStore, identityId: string, userId: string): Promise<Identity> {
+  const identity = await store.getIdentity(identityId);
+  if (!identity) throw new HTTPException(404, { message: "Identity not found" });
+  if (identity.user_id !== userId) throw new HTTPException(403, { message: "Identity does not belong to session user" });
+  if (identity.status !== "active") throw new HTTPException(409, { message: "Identity is not active" });
   return identity;
-};
+}
 
-const enforceRateLimit = (key: string, limit: number): void => {
-  if (!limiter.allow(key, limit, config.rateLimitWindowMs)) {
-    throw new ApiError(429, "Rate limit exceeded");
-  }
-};
+async function enforceRate(limiter: KVRateLimiter, key: string, env: Env): Promise<void> {
+  const limit = key.includes(":sign") && !key.includes("sign_intent")
+    ? parseInt(env.RATE_LIMIT_PER_IDENTITY_SIGN, 10)
+    : parseInt(env.RATE_LIMIT_PER_USER, 10);
+  const ok = await limiter.allow(key, limit, parseInt(env.RATE_LIMIT_WINDOW_MS, 10));
+  if (!ok) throw new HTTPException(429, { message: "Rate limit exceeded" });
+}
 
-const restoreFromBackupIfAvailable = async (identityId: string): Promise<boolean> => {
-  const backup = store.getBackup(identityId);
-  if (!backup) {
-    return false;
-  }
-  await enclaveClient.importKey(identityId, backup.alg, backup.sealed_key);
+async function restoreBackup(store: CloudflareStore, enclave: EnclaveClient, identityId: string): Promise<boolean> {
+  const backup = await store.getBackup(identityId);
+  if (!backup) return false;
+  await enclave.importKey(identityId, backup.alg, backup.sealed_key);
   return true;
+}
+
+async function sendTelegramMessage(botToken: string, chatId: number, text: string): Promise<void> {
+  try {
+    await fetch(`https://api.telegram.org/bot${botToken}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: chatId, text }),
+    });
+  } catch {
+    console.error("[telegram] sendMessage failed");
+  }
+}
+
+// ── Auth middleware ───────────────────────────────────────────
+
+const requireAuth = async (c: any, next: any) => {
+  const header = c.req.header("authorization") ?? "";
+  if (!header.startsWith("Bearer ")) throw new HTTPException(401, { message: "Missing bearer token" });
+  try {
+    const claims = await verifySessionToken(header.slice(7), c.env.SESSION_SIGNING_SECRET);
+    c.set("auth", claims);
+    await next();
+  } catch {
+    throw new HTTPException(401, { message: "Invalid session token" });
+  }
 };
 
-const botEnabled = config.telegramBotToken.length > 0;
+// ── Routes ────────────────────────────────────────────────────
 
-app.get("/health", (_req, res) => {
-  res.json({ ok: true, service: "api" });
-});
+app.get("/health", (c) => c.json({ ok: true, service: "api" }));
 
-// ── Swap proxy (reverse-proxy LendaSwap API to avoid CORS) ──
-
-app.get("/v1/swaps/:id", async (req, res, next) => {
-  try {
-    const upstream = await fetch(`${LENDASWAP_API}/swap/${encodeURIComponent(req.params.id)}`);
-    if (!upstream.ok) {
-      const text = await upstream.text();
-      throw new ApiError(upstream.status === 400 ? 404 : upstream.status, text || "Swap not found");
-    }
-    const data = await upstream.json();
-    res.json(data);
-  } catch (error) {
-    next(error);
+// Swap proxy (CORS workaround for web UI)
+app.get("/v1/swaps/:id", async (c) => {
+  const id = c.req.param("id");
+  const upstream = await fetch(`https://apilendaswap.lendasat.com/swap/${encodeURIComponent(id)}`);
+  if (!upstream.ok) {
+    const text = await upstream.text();
+    throw new HTTPException(upstream.status === 400 ? 404 : (upstream.status as any), {
+      message: text || "Swap not found",
+    });
   }
+  return c.json(await upstream.json());
 });
 
-// ── Auth: Challenge / Verify ──────────────────────────────
+// ── Auth ──────────────────────────────────────────────────────
 
-app.post("/v1/auth/challenge", (req, res, next) => {
-  try {
-    const body = parse(challengeRequestSchema, req.body);
-    const challenge = store.createChallenge(config.challengeTtlSeconds);
+app.post("/v1/auth/challenge", async (c) => {
+  const body = challengeRequestSchema.parse(await c.req.json());
+  const store = getStore(c.env);
+  const challenge = await store.createChallenge();
 
-    // Test mode: when bot is not configured, auto-resolve with provided telegram_user_id
-    if (!botEnabled && body.telegram_user_id) {
-      store.resolveChallenge(challenge.id, body.telegram_user_id);
-    }
+  const botEnabled = (c.env.TELEGRAM_BOT_TOKEN ?? "").length > 0;
+  if (!botEnabled && body.telegram_user_id) {
+    await store.resolveChallenge(challenge.id, body.telegram_user_id);
+  }
 
-    const deepLink = botEnabled
-      ? `https://t.me/${config.telegramBotUsername}?start=${challenge.id}`
-      : null;
-
-    res.status(201).json({
+  return c.json(
+    {
       challenge_id: challenge.id,
       expires_at: challenge.expires_at,
-      deep_link: deepLink
-    });
-  } catch (error) {
-    next(error);
-  }
+      deep_link: botEnabled ? `https://t.me/${c.env.TELEGRAM_BOT_USERNAME}?start=${challenge.id}` : null,
+    },
+    201,
+  );
 });
 
-app.post("/v1/auth/verify", (req, res, next) => {
-  try {
-    const body = parse(verifySchema, req.body);
-    const challenge = store.getChallenge(body.challenge_id);
-    if (!challenge) {
-      throw new ApiError(404, "Challenge not found or expired");
-    }
-    if (!challenge.telegram_user_id) {
-      throw new ApiError(202, "Challenge not yet resolved, user has not confirmed via Telegram");
-    }
+app.post("/v1/auth/verify", async (c) => {
+  const body = verifySchema.parse(await c.req.json());
+  const store = getStore(c.env);
 
-    const { user, created } = store.createOrGetUser(challenge.telegram_user_id);
-    if (created) {
-      store.addAuditEvent({
-        user_id: user.id,
-        identity_id: null,
-        action: "user.create",
-        metadata: { telegram_user_id: user.telegram_user_id }
-      });
-    }
+  const challenge = await store.getChallenge(body.challenge_id);
+  if (!challenge) throw new HTTPException(404, { message: "Challenge not found or expired" });
+  if (!challenge.telegram_user_id) throw new HTTPException(202, { message: "Challenge not yet resolved" });
 
-    const token = signSessionToken({
-      sub: user.id,
-      telegram_user_id: user.telegram_user_id
-    });
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: null,
-      action: "session.create",
-      metadata: {}
-    });
-
-    res.json({
-      token,
-      expires_in: config.sessionTtlSeconds,
-      user: {
-        id: user.id,
-        telegram_user_id: user.telegram_user_id,
-        status: user.status
-      }
-    });
-  } catch (error) {
-    next(error);
+  const { user, created } = await store.createOrGetUser(challenge.telegram_user_id);
+  if (created) {
+    await store.addAuditEvent({ user_id: user.id, identity_id: null, action: "user.create", metadata: { telegram_user_id: user.telegram_user_id } });
   }
+
+  const ttl = parseInt(c.env.SESSION_TTL_SECONDS, 10);
+  const token = await signSessionToken({ sub: user.id, telegram_user_id: user.telegram_user_id }, c.env.SESSION_SIGNING_SECRET, ttl);
+  await store.addAuditEvent({ user_id: user.id, identity_id: null, action: "session.create", metadata: {} });
+
+  return c.json({ token, expires_in: ttl, user: { id: user.id, telegram_user_id: user.telegram_user_id, status: user.status } });
 });
 
-app.post("/v1/auth/bot-session", (req, res, next) => {
-  try {
-    if (!config.botApiKey) {
-      throw new ApiError(501, "Bot sessions not configured (set BOT_API_KEY)");
-    }
+// ── Telegram Webhook ──────────────────────────────────────────
 
-    const apiKey = req.header("x-bot-api-key");
-    if (!apiKey || apiKey !== config.botApiKey) {
-      throw new ApiError(401, "Invalid bot API key");
-    }
+app.post("/telegram-webhook", async (c) => {
+  const update = await c.req.json();
+  const message = update.message;
+  if (!message?.text || !message.from) return c.json({ ok: true });
 
-    const body = parse(botSessionSchema, req.body);
-    const { user } = store.createOrGetUser(body.telegram_user_id);
+  const text = message.text.trim();
+  if (!text.startsWith("/start ")) return c.json({ ok: true });
 
-    const token = signSessionToken({
-      sub: user.id,
-      telegram_user_id: user.telegram_user_id,
-    });
+  const challengeId = text.slice("/start ".length).trim();
+  if (!challengeId) return c.json({ ok: true });
 
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: null,
-      action: "session.create",
-      metadata: { via: "bot-session" },
-    });
+  const store = getStore(c.env);
+  const resolved = await store.resolveChallenge(challengeId, String(message.from.id));
 
-    res.json({
-      token,
-      expires_in: config.sessionTtlSeconds,
-      user: {
-        id: user.id,
-        telegram_user_id: user.telegram_user_id,
-        status: user.status,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+  const reply = resolved
+    ? "You're logged in! You can close this chat and go back to the app."
+    : "This login link has expired or was already used. Please request a new one.";
+  await sendTelegramMessage(c.env.TELEGRAM_BOT_TOKEN, message.chat.id, reply);
+
+  return c.json({ ok: true });
 });
 
-// ── Identities ───────────────────────────────────────────
+// ── Identities ────────────────────────────────────────────────
 
-app.post("/v1/identities", requireAuth, async (req: Request, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    enforceRateLimit(`user:${user.id}:identity_create`, config.rateLimitPerUser);
-    const body = parse(createIdentitySchema, req.body);
-    const identityId = uuidv4();
-    const alg: SupportedAlg = body.alg ?? "secp256k1";
-    const generated = await enclaveClient.generate(identityId, alg);
-    const exported = await enclaveClient.exportKey(identityId);
-    store.putBackup({
-      identity_id: identityId,
-      alg: exported.alg,
-      sealed_key: exported.sealed_key
-    });
-    const identity = store.createIdentity({
-      id: identityId,
-      user_id: user.id,
-      alg,
-      public_key: generated.public_key
-    });
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: identity.id,
-      action: "identity.create",
-      metadata: { alg: identity.alg }
-    });
-    res.status(201).json(identity);
-  } catch (error) {
-    next(error);
-  }
+app.post("/v1/identities", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const store = getStore(c.env);
+  const limiter = getLimiter(c.env);
+  const enclave = getEnclave(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  await enforceRate(limiter, `user:${user.id}:identity_create`, c.env);
+
+  const body = createIdentitySchema.parse(await c.req.json());
+  const identityId = crypto.randomUUID();
+  const alg: SupportedAlg = body.alg ?? "secp256k1";
+
+  const generated = await enclave.generate(identityId, alg);
+  const exported = await enclave.exportKey(identityId);
+  await store.putBackup({ identity_id: identityId, alg: exported.alg, sealed_key: exported.sealed_key });
+
+  const identity = await store.createIdentity({ id: identityId, user_id: user.id, alg, public_key: generated.public_key });
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.create", metadata: { alg: identity.alg } });
+
+  return c.json(identity, 201);
 });
 
-app.post("/v1/identities/:id/restore", requireAuth, async (req: Request, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const identityId = req.params.id;
+app.post("/v1/identities/:id/restore", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const identityId = c.req.param("id");
+  const store = getStore(c.env);
+  const enclave = getEnclave(c.env);
 
-    // Already registered — just ensure key is loaded in enclave
-    const existing = store.getIdentity(identityId);
-    if (existing) {
-      if (existing.user_id !== user.id) {
-        throw new ApiError(403, "Identity does not belong to session user");
-      }
-      await restoreFromBackupIfAvailable(identityId);
-      res.json(existing);
-      return;
-    }
+  const user = await currentUser(store, auth.sub);
 
-    // Must have a backup to restore from
-    const backup = store.getBackup(identityId);
-    if (!backup) {
-      throw new ApiError(404, "No backup found for this identity");
-    }
-
-    // Restore key into enclave
-    await enclaveClient.importKey(identityId, backup.alg, backup.sealed_key);
-
-    // Re-create the identity record; client provides the public key
-    const body = req.body as { public_key?: string };
-    if (!body.public_key) {
-      throw new ApiError(400, "Missing public_key in request body");
-    }
-
-    const identity = store.createIdentity({
-      id: identityId,
-      user_id: user.id,
-      alg: backup.alg,
-      public_key: body.public_key,
-    });
-
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: identity.id,
-      action: "identity.restore",
-      metadata: { alg: identity.alg },
-    });
-
-    res.json(identity);
-  } catch (error) {
-    next(error);
+  const existing = await store.getIdentity(identityId);
+  if (existing) {
+    if (existing.user_id !== user.id) throw new HTTPException(403, { message: "Identity does not belong to session user" });
+    await restoreBackup(store, enclave, identityId);
+    return c.json(existing);
   }
+
+  const backup = await store.getBackup(identityId);
+  if (!backup) throw new HTTPException(404, { message: "No backup found for this identity" });
+
+  await enclave.importKey(identityId, backup.alg, backup.sealed_key);
+
+  const body = (await c.req.json()) as { public_key?: string };
+  if (!body.public_key) throw new HTTPException(400, { message: "Missing public_key in request body" });
+
+  const identity = await store.createIdentity({ id: identityId, user_id: user.id, alg: backup.alg, public_key: body.public_key });
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.restore", metadata: { alg: identity.alg } });
+
+  return c.json(identity);
 });
 
-app.post("/v1/identities/:id/sign-intent", requireAuth, (req: Request, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
-    enforceRateLimit(`user:${user.id}:sign_intent`, config.rateLimitPerUser);
-    const body = parse(signIntentSchema, req.body);
-    const digest = normalizeDigestHex(body.digest);
-    const digestHash = InMemoryStore.digestHash(digest);
-    const nonce = uuidv4();
-    const ticketId = uuidv4();
-    const ticket = signTicketToken({
-      jti: ticketId,
-      sub: user.id,
-      identity_id: identity.id,
-      digest_hash: digestHash,
-      scope: body.scope ?? "sign",
-      nonce
-    });
-    const expiresAt = new Date(Date.now() + config.ticketTtlSeconds * 1000).toISOString();
-    store.createTicket({
-      id: ticketId,
-      identity_id: identity.id,
-      digest_hash: digestHash,
-      scope: "sign",
-      expires_at: expiresAt,
-      nonce
-    });
-    res.status(201).json({
-      id: ticketId,
-      identity_id: identity.id,
-      digest_hash: digestHash,
-      nonce,
-      scope: "sign",
-      expires_at: expiresAt,
-      ticket
-    });
-  } catch (error) {
-    next(error);
-  }
+app.post("/v1/identities/:id/sign-intent", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const identityId = c.req.param("id");
+  const store = getStore(c.env);
+  const limiter = getLimiter(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  const identity = await ownedActiveIdentity(store, identityId, user.id);
+  await enforceRate(limiter, `user:${user.id}:sign_intent`, c.env);
+
+  const body = signIntentSchema.parse(await c.req.json());
+  const digest = normalizeDigestHex(body.digest);
+  const digestHash = await CloudflareStore.digestHash(digest);
+  const nonce = crypto.randomUUID();
+  const ticketId = crypto.randomUUID();
+
+  const ticketTtl = parseInt(c.env.TICKET_TTL_SECONDS, 10);
+  const ticket = await signTicketToken(
+    { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
+    c.env.TICKET_SIGNING_SECRET,
+    ticketTtl,
+  );
+
+  const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
+  await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
+
+  return c.json({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, nonce, scope: "sign", expires_at: expiresAt, ticket }, 201);
 });
 
-app.post("/v1/identities/:id/sign", requireAuth, async (req: Request, res, next) => {
+app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const identityId = c.req.param("id");
+  const store = getStore(c.env);
+  const limiter = getLimiter(c.env);
+  const enclave = getEnclave(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  const identity = await ownedActiveIdentity(store, identityId, user.id);
+  await enforceRate(limiter, `identity:${identity.id}:sign`, c.env);
+
+  const body = signSchema.parse(await c.req.json());
+  const digest = normalizeDigestHex(body.digest);
+  const digestHash = await CloudflareStore.digestHash(digest);
+
+  const claims = await verifyTicketToken(body.ticket, c.env.TICKET_SIGNING_SECRET);
+  if (claims.sub !== user.id) throw new HTTPException(403, { message: "Ticket user mismatch" });
+  if (claims.identity_id !== identity.id) throw new HTTPException(403, { message: "Ticket identity mismatch" });
+  if (claims.scope !== "sign") throw new HTTPException(403, { message: "Ticket scope mismatch" });
+  if (claims.digest_hash !== digestHash) throw new HTTPException(403, { message: "Ticket digest mismatch" });
+
+  const ticket = await store.getTicket(claims.jti);
+  if (!ticket) throw new HTTPException(404, { message: "Ticket not found" });
+  if (ticket.used_at) throw new HTTPException(409, { message: "Ticket already used" });
+  if (new Date(ticket.expires_at).getTime() <= Date.now()) throw new HTTPException(410, { message: "Ticket expired" });
+
+  let signature: string;
   try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
-    enforceRateLimit(`identity:${identity.id}:sign`, config.rateLimitPerIdentitySign);
-    const body = parse(signSchema, req.body);
-    const digest = normalizeDigestHex(body.digest);
-    const digestHash = InMemoryStore.digestHash(digest);
-    const claims = verifyTicketToken(body.ticket);
-    if (claims.sub !== user.id) {
-      throw new ApiError(403, "Ticket user mismatch");
+    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
+  } catch (error) {
+    if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+    if (!(await restoreBackup(store, enclave, identity.id))) {
+      throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
     }
-    if (claims.identity_id !== identity.id) {
-      throw new ApiError(403, "Ticket identity mismatch");
-    }
-    if (claims.scope !== "sign") {
-      throw new ApiError(403, "Ticket scope mismatch");
-    }
-    if (claims.digest_hash !== digestHash) {
-      throw new ApiError(403, "Ticket digest mismatch");
-    }
-    const ticket = store.getTicket(claims.jti);
-    if (!ticket) {
-      throw new ApiError(404, "Ticket not found");
-    }
-    if (ticket.used_at) {
-      throw new ApiError(409, "Ticket already used");
-    }
-    if (new Date(ticket.expires_at).getTime() <= Date.now()) {
-      throw new ApiError(410, "Ticket expired");
-    }
+    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
+  }
+
+  await store.markTicketUsed(ticket.id);
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { digest_hash: digestHash } });
+
+  return c.json({ signature });
+});
+
+app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const identityId = c.req.param("id");
+  const store = getStore(c.env);
+  const limiter = getLimiter(c.env);
+  const enclave = getEnclave(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  const identity = await ownedActiveIdentity(store, identityId, user.id);
+  await enforceRate(limiter, `identity:${identity.id}:sign`, c.env);
+
+  const body = signBatchSchema.parse(await c.req.json());
+  const ticketTtl = parseInt(c.env.TICKET_TTL_SECONDS, 10);
+  const signatures: string[] = [];
+
+  for (const item of body.digests) {
+    const digest = normalizeDigestHex(item.digest);
+    const digestHash = await CloudflareStore.digestHash(digest);
+    const nonce = crypto.randomUUID();
+    const ticketId = crypto.randomUUID();
+
+    const ticket = await signTicketToken(
+      { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
+      c.env.TICKET_SIGNING_SECRET,
+      ticketTtl,
+    );
+
+    const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
+    await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
 
     let signature: string;
     try {
-      const signed = await enclaveClient.sign(identity.id, digest, body.ticket);
-      signature = signed.signature;
+      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
     } catch (error) {
-      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
-        throw error;
+      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+      if (!(await restoreBackup(store, enclave, identity.id))) {
+        throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
       }
-      const restored = await restoreFromBackupIfAvailable(identity.id);
-      if (!restored) {
-        throw new ApiError(409, "Key not present in enclave and no backup available");
-      }
-      const signed = await enclaveClient.sign(identity.id, digest, body.ticket);
-      signature = signed.signature;
+      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
     }
 
-    store.markTicketUsed(ticket.id);
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: identity.id,
-      action: "identity.sign",
-      metadata: { digest_hash: digestHash }
-    });
-    res.json({ signature });
-  } catch (error) {
-    next(error);
+    await store.markTicketUsed(ticketId);
+    signatures.push(signature);
   }
+
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { batch_size: body.digests.length } });
+
+  return c.json({ signatures });
 });
 
-app.post("/v1/identities/:id/sign-batch", requireAuth, async (req: Request, res, next) => {
+app.delete("/v1/identities/:id", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const identityId = c.req.param("id");
+  const store = getStore(c.env);
+  const limiter = getLimiter(c.env);
+  const enclave = getEnclave(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  const identity = await ownedActiveIdentity(store, identityId, user.id);
+  await enforceRate(limiter, `identity:${identity.id}:destroy`, c.env);
+
   try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
-    enforceRateLimit(`identity:${identity.id}:sign`, config.rateLimitPerIdentitySign);
-    const body = parse(signBatchSchema, req.body);
-
-    const signatures: string[] = [];
-    for (const item of body.digests) {
-      const digest = normalizeDigestHex(item.digest);
-      const digestHash = InMemoryStore.digestHash(digest);
-      const nonce = uuidv4();
-      const ticketId = uuidv4();
-      const ticket = signTicketToken({
-        jti: ticketId,
-        sub: user.id,
-        identity_id: identity.id,
-        digest_hash: digestHash,
-        scope: "sign",
-        nonce
-      });
-      const expiresAt = new Date(Date.now() + config.ticketTtlSeconds * 1000).toISOString();
-      store.createTicket({
-        id: ticketId,
-        identity_id: identity.id,
-        digest_hash: digestHash,
-        scope: "sign",
-        expires_at: expiresAt,
-        nonce
-      });
-
-      let signature: string;
-      try {
-        const signed = await enclaveClient.sign(identity.id, digest, ticket);
-        signature = signed.signature;
-      } catch (error) {
-        if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
-          throw error;
-        }
-        const restored = await restoreFromBackupIfAvailable(identity.id);
-        if (!restored) {
-          throw new ApiError(409, "Key not present in enclave and no backup available");
-        }
-        const signed = await enclaveClient.sign(identity.id, digest, ticket);
-        signature = signed.signature;
-      }
-
-      store.markTicketUsed(ticketId);
-      signatures.push(signature);
+    await enclave.destroy(identity.id);
+  } catch (error) {
+    if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+    if (await restoreBackup(store, enclave, identity.id)) {
+      await enclave.destroy(identity.id);
     }
-
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: identity.id,
-      action: "identity.sign",
-      metadata: { batch_size: body.digests.length }
-    });
-    res.json({ signatures });
-  } catch (error) {
-    next(error);
   }
+
+  await store.markIdentityDestroyed(identity.id);
+  await store.deleteBackup(identity.id);
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.destroy", metadata: { reason: "user-request" } });
+
+  return c.json({ ok: true });
 });
 
-app.delete("/v1/identities/:id", requireAuth, async (req: Request, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const identity = requireOwnedActiveIdentity(req.params.id, user.id);
-    enforceRateLimit(`identity:${identity.id}:destroy`, config.rateLimitPerUser);
+// ── Audit ─────────────────────────────────────────────────────
 
-    try {
-      await enclaveClient.destroy(identity.id);
-    } catch (error) {
-      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) {
-        throw error;
-      }
-      const restored = await restoreFromBackupIfAvailable(identity.id);
-      if (restored) {
-        await enclaveClient.destroy(identity.id);
-      }
-    }
-    store.markIdentityDestroyed(identity.id);
-    store.deleteBackup(identity.id);
-    store.addAuditEvent({
-      user_id: user.id,
-      identity_id: identity.id,
-      action: "identity.destroy",
-      metadata: { reason: "user-request" }
-    });
-    res.json({ ok: true });
-  } catch (error) {
-    next(error);
-  }
+app.get("/v1/audit", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const store = getStore(c.env);
+
+  const user = await currentUser(store, auth.sub);
+  const { limit, offset } = paginationSchema.parse({
+    limit: c.req.query("limit"),
+    offset: c.req.query("offset"),
+  });
+  const items = await store.listAuditEventsForUser(user.id, limit, offset);
+
+  return c.json({ items, limit, offset, count: items.length });
 });
 
-app.get("/v1/audit", requireAuth, (req: Request, res, next) => {
-  try {
-    const authReq = req as AuthenticatedRequest;
-    const user = currentUserFromRequest(authReq);
-    const { limit, offset } = parsePagination(req);
-    const items = store.listAuditEventsForUser(user.id, limit, offset);
-    res.json({
-      items,
-      limit,
-      offset,
-      count: items.length
-    });
-  } catch (error) {
-    next(error);
+// ── Error handler ─────────────────────────────────────────────
+
+app.onError((err, c) => {
+  if (err instanceof z.ZodError) {
+    return c.json({ error: "Validation error", details: err.flatten() }, 400);
   }
+  if (err instanceof HTTPException) {
+    return c.json({ error: err.message }, err.status as any);
+  }
+  if (err instanceof EnclaveClientError) {
+    return c.json({ error: `Enclave error: ${err.message}` }, 502);
+  }
+  console.error("Unhandled error:", err);
+  return c.json({ error: "Internal server error" }, 500);
 });
 
-// ── Error handler ─────────────────────────────────────────
-
-app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
-  if (error instanceof z.ZodError) {
-    res.status(400).json({ error: "Validation error", details: error.flatten() });
-    return;
-  }
-  if (error instanceof ApiError) {
-    res.status(error.status).json({ error: error.message });
-    return;
-  }
-  if (error instanceof jwt.JsonWebTokenError) {
-    res.status(401).json({ error: "Invalid or expired ticket token" });
-    return;
-  }
-  if (error instanceof EnclaveClientError) {
-    res.status(502).json({ error: `Enclave error: ${error.message}` });
-    return;
-  }
-  const message = error instanceof Error ? error.message : "Internal server error";
-  res.status(500).json({ error: message });
-});
-
-// ── Start ─────────────────────────────────────────────────
-
-if (botEnabled) {
-  const bot = new TelegramBot({ token: config.telegramBotToken, store });
-  bot.start();
-  // eslint-disable-next-line no-console
-  console.log(`Telegram bot started (@${config.telegramBotUsername})`);
-}
-
-const server = app.listen(config.port, () => {
-  // eslint-disable-next-line no-console
-  console.log(`API service listening on :${config.port}`);
-});
-
-gracefulShutdown(server);
-
-class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    message: string
-  ) {
-    super(message);
-  }
-}
+export default app;

@@ -7,6 +7,7 @@ import { z } from "zod";
 import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
 import { config } from "./config.js";
 import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
+import { gracefulShutdown } from "@clw-cash/shared";
 import { SlidingWindowRateLimiter } from "./rateLimit.js";
 import { InMemoryStore } from "./store.js";
 import { TelegramBot } from "./telegramBot.js";
@@ -557,25 +558,7 @@ const server = app.listen(config.port, () => {
   console.log(`API service listening on :${config.port}`);
 });
 
-function gracefulShutdown(signal: string) {
-  // eslint-disable-next-line no-console
-  console.log(`\n${signal} received, shutting down gracefully...`);
-  server.close(() => {
-    // eslint-disable-next-line no-console
-    console.log("HTTP server closed.");
-    store.flush();
-    process.exit(0);
-  });
-  // Force exit after 5s if connections don't close
-  setTimeout(() => {
-    // eslint-disable-next-line no-console
-    console.error("Forcing shutdown after timeout.");
-    process.exit(1);
-  }, 5000).unref();
-}
-
-process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+gracefulShutdown(server);
 
 class ApiError extends Error {
   constructor(

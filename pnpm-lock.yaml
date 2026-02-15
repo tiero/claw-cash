@@ -76,9 +76,6 @@ importers:
 
   enclave:
     dependencies:
-      '@clw-cash/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@noble/secp256k1':
         specifier: 3.0.0
         version: 3.0.0
@@ -113,15 +110,6 @@ importers:
       '@noble/hashes':
         specifier: ^2.0.1
         version: 2.0.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.13.4
-        version: 22.19.11
-      typescript:
-        specifier: ^5.7.3
-        version: 5.9.3
-
-  shared:
     devDependencies:
       '@types/node':
         specifier: ^22.13.4

@@ -15,7 +15,7 @@ hashes.sha256 = (...msgs: Uint8Array[]): Uint8Array => {
 };
 import { errors, jwtVerify } from "jose";
 import { z } from "zod";
-import { gracefulShutdown } from "@clw-cash/shared";
+import { gracefulShutdown } from "./graceful-shutdown.js";
 import { config } from "./config.js";
 
 const ticketSecret = new TextEncoder().encode(config.ticketSigningSecret);

@@ -255,7 +255,7 @@ export class LendaSwapSkill implements StablecoinSwapSkill {
       sourceToken: params.sourceToken,
       sourceAmount: params.sourceAmount,
       targetAddress: arkAddress,
-      userAddress: params.userAddress,
+      userAddress: params.userAddress || "0x0000000000000000000000000000000000000000",
       referralCode: params.referralCode || this.referralCode,
     });
 

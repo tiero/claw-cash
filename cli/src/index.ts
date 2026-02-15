@@ -114,7 +114,7 @@ async function main() {
         await handleSend(ctx, argv);
         break;
       case "receive":
-        await handleReceive(ctx, argv);
+        await handleReceive(ctx, argv, config);
         break;
       case "balance":
         await handleBalance(ctx);

@@ -6,16 +6,13 @@ export function gracefulShutdown(
   timeoutMs = 5000
 ): void {
   const handler = (signal: string) => {
-    // eslint-disable-next-line no-console
     console.log(`\n${signal} received, shutting down gracefully...`);
     server.close(() => {
-      // eslint-disable-next-line no-console
       console.log("Server closed.");
       onClose?.();
       process.exit(0);
     });
     setTimeout(() => {
-      // eslint-disable-next-line no-console
       console.error("Forcing shutdown after timeout.");
       process.exit(1);
     }, timeoutMs).unref();

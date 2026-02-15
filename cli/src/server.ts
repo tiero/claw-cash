@@ -1,7 +1,40 @@
 import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { CashContext } from "./context.js";
 import type { SwapMonitor } from "./monitor.js";
-import type { EvmChain, StablecoinToken } from "@clw-cash/skills";
+import type { EvmChain, StablecoinToken, StablecoinSwapInfo, StablecoinSwapStatus } from "@clw-cash/skills";
+
+const CATEGORY_MAP: Record<StablecoinSwapStatus, string> = {
+  pending: "pending",
+  awaiting_funding: "pending",
+  funded: "pending",
+  processing: "pending",
+  completed: "claimed",
+  refunded: "refunded",
+  expired: "expired",
+  failed: "failed",
+};
+
+function groupSwaps(
+  swaps: StablecoinSwapInfo[],
+  categories: Set<string>,
+  limit: number
+): Record<string, StablecoinSwapInfo[]> {
+  const grouped: Record<string, StablecoinSwapInfo[]> = {};
+  for (const cat of categories) grouped[cat] = [];
+
+  const sorted = [...swaps].sort(
+    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  );
+
+  for (const swap of sorted) {
+    const cat = CATEGORY_MAP[swap.status];
+    if (cat && categories.has(cat) && grouped[cat].length < limit) {
+      grouped[cat].push(swap);
+    }
+  }
+
+  return grouped;
+}
 
 export interface DaemonServerOpts {
   port: number;
@@ -62,15 +95,15 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
 
       // GET /swaps
       if (method === "GET" && url.pathname === "/swaps") {
-        const [lightningSwaps, lendaSwaps] = await Promise.all([
-          ctx.lightning.getPendingSwaps(),
-          ctx.swap.getPendingSwaps(),
-        ]);
+        const limit = parseInt(url.searchParams.get("limit") ?? "5", 10) || 5;
+        const reqCategories = url.searchParams.getAll("category");
+        const allCats = ["pending", "claimed", "refunded", "expired", "failed"];
+        const categories = new Set(reqCategories.length > 0 ? reqCategories : allCats);
 
-        return json(res, 200, {
-          lightning: lightningSwaps,
-          lendaswap: lendaSwaps,
-        });
+        const lendaSwaps = await ctx.swap.getSwapHistory();
+        const lendaswap = groupSwaps(lendaSwaps, categories, limit);
+
+        return json(res, 200, { lendaswap });
       }
 
       // POST /swaps/:id/claim
@@ -82,6 +115,34 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
         }
 
         const result = await ctx.swap.claimSwap(swapId);
+        return json(res, 200, result);
+      }
+
+      // POST /swaps/:id/refund
+      if (method === "POST" && url.pathname.startsWith("/swaps/") && url.pathname.endsWith("/refund")) {
+        const parts = url.pathname.split("/");
+        const swapId = parts[2];
+        if (!swapId) {
+          return json(res, 400, { error: "Missing swap ID" });
+        }
+
+        const body = await readBody(req);
+        const destinationAddress = body.destinationAddress as string | undefined;
+
+        const info = await ctx.swap.getSwapStatus(swapId);
+
+        if (info.direction === "stablecoin_to_btc") {
+          const callData = await ctx.swap.getEvmRefundCallData(swapId);
+          return json(res, 200, {
+            type: "evm_refund",
+            swapId,
+            timelockExpired: callData.timelockExpired,
+            timelockExpiry: callData.timelockExpiry,
+            transaction: { to: callData.to, data: callData.data },
+          });
+        }
+
+        const result = await ctx.swap.refundSwap(swapId, { destinationAddress });
         return json(res, 200, result);
       }
 

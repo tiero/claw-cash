@@ -61,15 +61,24 @@ export async function handleReceive(
     }
   }
 
-  // Stablecoin receive: generate a payment URL
+  // Stablecoin receive: create swap via SDK (CLI owns preimage for claiming) and generate payment URL
   if (currency !== "btc") {
     const sourceToken = toStablecoinToken(currency, where);
     const arkAddress = await ctx.bitcoin.getArkAddress();
+
+    const result = await ctx.swap.swapStablecoinToBtc({
+      sourceChain: where as import("@clw-cash/skills").EvmChain,
+      sourceToken: sourceToken as import("@clw-cash/skills").StablecoinToken,
+      sourceAmount: amount!,
+      targetAddress: arkAddress,
+    });
+
     const apiBaseUrl = config.apiBaseUrl;
-    const paymentUrl = `${apiBaseUrl}/pay?amount=${amount}&token=${sourceToken}&chain=${where}&to=${arkAddress}`;
+    const paymentUrl = `${apiBaseUrl}/pay?id=${result.swapId}`;
 
     return outputSuccess({
       paymentUrl,
+      swapId: result.swapId,
       amount,
       token: sourceToken,
       chain: where,

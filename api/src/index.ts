@@ -38,6 +38,8 @@ const store = new InMemoryStore(config.backupFilePath);
 const enclaveClient = new EnclaveClient(config.enclaveBaseUrl, config.internalApiKey, config.evApiKey || undefined);
 const limiter = new SlidingWindowRateLimiter();
 
+const LENDASWAP_API = "https://apilendaswap.lendasat.com";
+
 const requireAuth = (req: Request, res: Response, next: NextFunction): void => {
   const authHeader = req.header("authorization") ?? "";
   if (!authHeader.startsWith("Bearer ")) {
@@ -103,6 +105,22 @@ const botEnabled = config.telegramBotToken.length > 0;
 
 app.get("/health", (_req, res) => {
   res.json({ ok: true, service: "api" });
+});
+
+// ── Swap proxy (reverse-proxy LendaSwap API to avoid CORS) ──
+
+app.get("/v1/swaps/:id", async (req, res, next) => {
+  try {
+    const upstream = await fetch(`${LENDASWAP_API}/swap/${encodeURIComponent(req.params.id)}`);
+    if (!upstream.ok) {
+      const text = await upstream.text();
+      throw new ApiError(upstream.status === 400 ? 404 : upstream.status, text || "Swap not found");
+    }
+    const data = await upstream.json();
+    res.json(data);
+  } catch (error) {
+    next(error);
+  }
 });
 
 // ── Auth: Challenge / Verify ──────────────────────────────

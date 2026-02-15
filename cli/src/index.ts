@@ -12,6 +12,8 @@ import { handleStart } from "./commands/start.js";
 import { handleStop } from "./commands/stop.js";
 import { handleStatus } from "./commands/status.js";
 import { handleSwaps } from "./commands/swaps.js";
+import { handleClaim } from "./commands/claim.js";
+import { handleRefund } from "./commands/refund.js";
 import { handleLogin } from "./commands/login.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
@@ -27,7 +29,12 @@ Usage:
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
   cash status                 Show daemon status
-  cash swaps                  List pending swaps
+  cash swaps                  List swaps (last 5 per category)
+    --pending --claimed --refunded --expired --failed  (filter)
+    --limit <n>                 Max per category (default: 5)
+  cash claim <swapId>           Manually claim a swap (reveal preimage)
+  cash refund <swapId>          Manually refund a swap
+    --address <destination>     Refund destination (optional)
 
 Currency: btc | usdt | usdc
 Where:    onchain | lightning | arkade | polygon | arbitrum | ethereum
@@ -54,7 +61,7 @@ Environment:
 
 const argv = minimist(process.argv.slice(2), {
   string: [
-    "amount", "currency", "where", "to", "address",
+    "amount", "currency", "where", "to", "address", "id",
     "api-url", "token", "ark-server", "network", "port",
   ],
   boolean: ["help", "version", "daemon-internal"],
@@ -120,7 +127,13 @@ async function main() {
         await handleBalance(ctx);
         break;
       case "swaps":
-        await handleSwaps(ctx);
+        await handleSwaps(ctx, argv);
+        break;
+      case "claim":
+        await handleClaim(ctx, argv);
+        break;
+      case "refund":
+        await handleRefund(ctx, argv);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

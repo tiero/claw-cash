@@ -1,6 +1,8 @@
-import { type ChildProcess, spawn } from "node:child_process";
+import { type ChildProcess, execSync, spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { resolve } from "node:path";
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 const API_PORT = 14_000 + Math.floor(Math.random() * 1000);
@@ -22,10 +24,15 @@ const env = {
   BACKUP_FILE_PATH: `/tmp/clw-e2e-backups-${Date.now()}.json`,
 };
 
+const ROOT = process.cwd();
+const API_DIR = resolve(ROOT, "api");
+const WRANGLER = resolve(API_DIR, "node_modules/.bin/wrangler");
+const PERSIST_DIR = mkdtempSync(join(tmpdir(), "clw-e2e-"));
+
 let enclaveProc: ChildProcess;
 let apiProc: ChildProcess;
 
-async function waitForHealth(url: string, maxMs = 15_000): Promise<void> {
+async function waitForHealth(url: string, maxMs = 30_000): Promise<void> {
   const deadline = Date.now() + maxMs;
   while (Date.now() < deadline) {
     try {
@@ -39,23 +46,49 @@ async function waitForHealth(url: string, maxMs = 15_000): Promise<void> {
   throw new Error(`Service at ${url} did not become healthy within ${maxMs}ms`);
 }
 
-function spawnService(
-  name: string,
-  entrypoint: string,
-  extraEnv: Record<string, string> = {}
-): ChildProcess {
-  const pkgDir = resolve(process.cwd(), entrypoint, "../..");
-  const tsx = resolve(pkgDir, "node_modules/.bin/tsx");
-  const proc = spawn(tsx, [resolve(process.cwd(), entrypoint)], {
-    cwd: process.cwd(),
-    env: { ...env, ...extraEnv },
+function spawnEnclave(): ChildProcess {
+  const tsx = resolve(ROOT, "enclave/node_modules/.bin/tsx");
+  const proc = spawn(tsx, [resolve(ROOT, "enclave/src/index.ts")], {
+    cwd: ROOT,
+    env: { ...env, ENCLAVE_PORT: String(ENCLAVE_PORT) },
     stdio: ["ignore", "pipe", "pipe"],
   });
   proc.stdout?.on("data", (d: Buffer) =>
-    process.stderr.write(`[${name}] ${d}`)
+    process.stderr.write(`[enclave] ${d}`)
   );
   proc.stderr?.on("data", (d: Buffer) =>
-    process.stderr.write(`[${name}:err] ${d}`)
+    process.stderr.write(`[enclave:err] ${d}`)
+  );
+  return proc;
+}
+
+function spawnApi(): ChildProcess {
+  const proc = spawn(
+    WRANGLER,
+    [
+      "dev",
+      "--port", String(API_PORT),
+      "--persist-to", PERSIST_DIR,
+      "--var", `INTERNAL_API_KEY:${INTERNAL_API_KEY}`,
+      "--var", `TICKET_SIGNING_SECRET:${TICKET_SECRET}`,
+      "--var", `SESSION_SIGNING_SECRET:${SESSION_SECRET}`,
+      "--var", `ENCLAVE_BASE_URL:${ENCLAVE_BASE}`,
+      "--var", "TELEGRAM_BOT_TOKEN:",
+      "--var", "TELEGRAM_BOT_USERNAME:",
+      "--var", "EV_API_KEY:",
+      "--show-interactive-dev-session", "false",
+    ],
+    {
+      cwd: API_DIR,
+      env: { ...process.env },
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  proc.stdout?.on("data", (d: Buffer) =>
+    process.stderr.write(`[api] ${d}`)
+  );
+  proc.stderr?.on("data", (d: Buffer) =>
+    process.stderr.write(`[api:err] ${d}`)
   );
   return proc;
 }
@@ -76,19 +109,20 @@ function killProc(proc: ChildProcess | undefined): Promise<void> {
 // ── Lifecycle ──────────────────────────────────────────────
 
 beforeAll(async () => {
-  enclaveProc = spawnService("enclave", "enclave/src/index.ts", {
-    ENCLAVE_PORT: String(ENCLAVE_PORT),
-  });
-  apiProc = spawnService("api", "api/src/index.ts", {
-    API_PORT: String(API_PORT),
-    ENCLAVE_BASE_URL: ENCLAVE_BASE,
-  });
+  // Apply D1 migrations locally before starting wrangler dev
+  execSync(
+    `${WRANGLER} d1 migrations apply clw-cash-db --local --persist-to ${PERSIST_DIR}`,
+    { cwd: API_DIR, stdio: "pipe" },
+  );
+
+  enclaveProc = spawnEnclave();
+  apiProc = spawnApi();
 
   await Promise.all([
     waitForHealth(ENCLAVE_BASE),
     waitForHealth(API_BASE),
   ]);
-});
+}, 45_000);
 
 afterAll(async () => {
   await Promise.all([killProc(apiProc), killProc(enclaveProc)]);
@@ -261,6 +295,7 @@ describe("Full user journey", () => {
 describe("Sealed backup export / import", () => {
   let sessionToken: string;
   let identityId: string;
+  let sealedKey: string;
 
   it("setup: authenticate", async () => {
     const challenge = await post("/v1/auth/challenge", {
@@ -272,7 +307,7 @@ describe("Sealed backup export / import", () => {
     sessionToken = json.token;
   });
 
-  it("backup file contains sealed_key, not private_key", async () => {
+  it("enclave export returns sealed_key, not private_key", async () => {
     const { json } = await post(
       "/v1/identities",
       { alg: "secp256k1" },
@@ -280,20 +315,27 @@ describe("Sealed backup export / import", () => {
     );
     identityId = json.id;
 
-    // Read the backup file and verify shape
-    const { readFileSync } = await import("node:fs");
-    const raw = readFileSync(env.BACKUP_FILE_PATH!, "utf-8");
-    const backups = JSON.parse(raw);
-    const backup = backups[identityId];
+    // Export sealed key directly from enclave
+    const exportRes = await fetch(`${ENCLAVE_BASE}/internal/backup/export`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-api-key": INTERNAL_API_KEY,
+      },
+      body: JSON.stringify({ identity_id: identityId }),
+    });
+    expect(exportRes.status).toBe(200);
+    const backup = await exportRes.json();
 
-    expect(backup).toBeDefined();
     expect(backup.sealed_key).toBeDefined();
     expect(typeof backup.sealed_key).toBe("string");
     expect(backup.sealed_key.length).toBeGreaterThan(0);
-    // Must NOT contain a raw 64-char hex private key
+    expect(backup.alg).toBe("secp256k1");
+    // Must NOT contain a raw private key
     expect(backup).not.toHaveProperty("private_key");
     // Sealed key should be in AES format (iv:ciphertext:tag) for local dev
     expect(backup.sealed_key.split(":").length).toBe(3);
+    sealedKey = backup.sealed_key;
   });
 
   it("backup restore works: sign after enclave key is destroyed internally", async () => {
@@ -308,7 +350,7 @@ describe("Sealed backup export / import", () => {
     });
     expect(destroyRes.status).toBe(200);
 
-    // Now sign through the API — should auto-restore from sealed backup
+    // Now sign through the API — should auto-restore from sealed backup (stored in D1)
     const digest = randomBytes(32).toString("hex");
     const intentRes = await post(
       `/v1/identities/${identityId}/sign-intent`,
@@ -354,25 +396,19 @@ describe("Sealed backup export / import", () => {
   });
 
   it("cleanup: destroy identity", async () => {
-    // Restore key first so destroy works
-    const { readFileSync } = await import("node:fs");
-    const raw = readFileSync(env.BACKUP_FILE_PATH!, "utf-8");
-    const backups = JSON.parse(raw);
-    const backup = backups[identityId];
-    if (backup) {
-      await fetch(`${ENCLAVE_BASE}/internal/backup/import`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          "x-internal-api-key": INTERNAL_API_KEY,
-        },
-        body: JSON.stringify({
-          identity_id: identityId,
-          alg: backup.alg,
-          sealed_key: backup.sealed_key,
-        }),
-      });
-    }
+    // Restore key in enclave so API destroy can wipe it
+    await fetch(`${ENCLAVE_BASE}/internal/backup/import`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-internal-api-key": INTERNAL_API_KEY,
+      },
+      body: JSON.stringify({
+        identity_id: identityId,
+        alg: "secp256k1",
+        sealed_key: sealedKey,
+      }),
+    });
     await del(`/v1/identities/${identityId}`, sessionToken);
   });
 });

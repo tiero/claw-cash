@@ -43,8 +43,8 @@ export async function handleReceive(
 
     // Generate payment URL — sender chooses chain on the web page
     const arkAddress = await ctx.bitcoin.getArkAddress();
-    const apiBaseUrl = config.apiBaseUrl;
-    const paymentUrl = `${apiBaseUrl}/pay?amount=${amount}&to=${arkAddress}&currency=${currency}`;
+    const payBaseUrl = config.apiBaseUrl.replace("api.", "pay.");
+    const paymentUrl = `${payBaseUrl}?amount=${amount}&to=${arkAddress}&currency=${currency}`;
 
     return outputSuccess({
       paymentUrl,
@@ -99,8 +99,8 @@ export async function handleReceive(
       targetAddress: arkAddress,
     });
 
-    const apiBaseUrl = config.apiBaseUrl;
-    const paymentUrl = `${apiBaseUrl}/pay?id=${result.swapId}`;
+    const payBaseUrl = config.apiBaseUrl.replace("api.", "pay.");
+    const paymentUrl = `${payBaseUrl}?id=${result.swapId}`;
 
     return outputSuccess({
       paymentUrl,

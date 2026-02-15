@@ -52,3 +52,10 @@ export {
   TOKEN_DECIMALS,
   type LendaSwapSkillConfig,
 } from "./lendaswap.js";
+
+export {
+  toSatoshi,
+  fromSatoshi,
+  toSmallestUnit,
+  fromSmallestUnit,
+} from "./units.js";

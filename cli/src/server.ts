@@ -141,7 +141,7 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
           targetAddress: to,
           targetToken: body.targetToken as StablecoinToken,
           targetChain: body.targetChain as EvmChain,
-          sourceAmount: amount,
+          targetAmount: body.targetAmount as number,
         });
         return json(res, 200, result);
       }

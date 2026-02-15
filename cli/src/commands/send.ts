@@ -9,6 +9,7 @@ import {
   toStablecoinToken,
   toEvmChain,
 } from "../utils/token.js";
+import { toSmallestUnit } from "@clw-cash/skills";
 import type { ParsedArgs } from "minimist";
 
 export async function handleSend(
@@ -71,7 +72,7 @@ export async function handleSend(
 
   // Flag mode: cash send --amount 100000 --currency btc --where arkade --to <dest>
   if (!amountStr) {
-    return outputError("Missing --amount <sats>");
+    return outputError("Missing --amount <value> (sats for btc, units for usdt/usdc)");
   }
   if (!currency) {
     return outputError("Missing --currency <btc|usdt|usdc>");
@@ -80,7 +81,7 @@ export async function handleSend(
     return outputError("Missing --where <onchain|lightning|arkade|polygon|arbitrum|ethereum>");
   }
 
-  const amount = parseInt(amountStr, 10);
+  const amount = currency === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
   if (isNaN(amount) || amount <= 0) {
     return outputError(`Invalid amount: ${amountStr}`);
   }
@@ -108,10 +109,14 @@ export async function handleSend(
 
   // Proxy through daemon when running (swap stays in daemon process for monitoring)
   if (getDaemonUrl()) {
-    const body: Record<string, unknown> = { amount, currency, where, to };
-    if (currency !== "btc") {
-      body.targetToken = toStablecoinToken(currency, where);
+    const body: Record<string, unknown> = { currency, where, to };
+    if (currency === "btc") {
+      body.amount = amount;
+    } else {
+      const targetToken = toStablecoinToken(currency, where);
+      body.targetToken = targetToken;
       body.targetChain = toEvmChain(where);
+      body.targetAmount = toSmallestUnit(amount, targetToken);
     }
     const result = await daemonPost("/send", body);
     return outputSuccess(result);
@@ -137,7 +142,7 @@ export async function handleSend(
     targetAddress: to,
     targetToken,
     targetChain,
-    sourceAmount: amount,
+    targetAmount: toSmallestUnit(amount, targetToken),
   });
   return outputSuccess(result);
 }

@@ -8,4 +8,5 @@ export default defineConfig({
   clean: true,
   banner: { js: "#!/usr/bin/env node" },
   noExternal: ["@clw-cash/sdk", "@clw-cash/skills", "@lendasat/lendaswap-sdk-pure", "@noble/hashes"],
+  external: ["better-sqlite3"],
 });

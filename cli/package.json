@@ -1,6 +1,6 @@
 {
   "name": "clw-cash",
-  "version": "0.1.5",
+  "version": "0.1.8",
   "description": "Bitcoin & Stablecoin agent wallet CLI. Keys held in a secure enclave.",
   "type": "module",
   "bin": {
@@ -21,6 +21,7 @@
     "@arkade-os/boltz-swap": "^0.2.18",
     "@lendasat/lendaswap-sdk-pure": "^0.0.2",
     "@noble/hashes": "^2.0.1",
+    "better-sqlite3": "^12.6.2",
     "minimist": "^1.2.8"
   },
   "devDependencies": {

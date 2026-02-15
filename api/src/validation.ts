@@ -37,6 +37,10 @@ export const signBatchSchema = z.object({
   ).min(1).max(100)
 });
 
+export const botSessionSchema = z.object({
+  telegram_user_id: z.string().min(1).max(64)
+});
+
 export const paginationSchema = z.object({
   limit: z.coerce.number().min(1).max(200).default(50),
   offset: z.coerce.number().min(0).default(0)

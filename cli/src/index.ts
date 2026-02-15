@@ -12,6 +12,7 @@ import { handleStart } from "./commands/start.js";
 import { handleStop } from "./commands/stop.js";
 import { handleStatus } from "./commands/status.js";
 import { handleSwaps } from "./commands/swaps.js";
+import { handleLogin } from "./commands/login.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -22,6 +23,7 @@ Usage:
   cash receive --amount <sats> --currency <btc|usdt|usdc> --where <network>
   cash balance
   cash init --api-url <url> --token <jwt> --ark-server <url>
+  cash login                  Re-authenticate via Telegram (refresh token)
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
   cash status                 Show daemon status
@@ -84,6 +86,9 @@ async function main() {
     switch (command) {
       case "init":
         await handleInit(argv);
+        return;
+      case "login":
+        await handleLogin();
         return;
       case "start":
         await handleStart();

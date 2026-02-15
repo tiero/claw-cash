@@ -7,14 +7,22 @@ All commands output JSON to stdout. Exit code 0 = success, 1 = error.
 ## Setup
 
 ```bash
-cash init --api-url https://api.clw.cash --token <jwt> --ark-server https://ark.clw.cash
+# First time — authenticates, creates identity, saves config, starts daemon
+cash init --api-url https://api.clw.cash --ark-server https://ark.clw.cash
+
+# Re-authenticate when session expires
+cash login
 ```
 
-`init` creates an identity, saves config to `~/.clw-cash/config.json`, and **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling). If the daemon stops, restart it with `cash start`.
+`init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). It creates an identity, saves config to `~/.clw-cash/config.json`, and **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
+
+If the session token expires, run `cash login` to re-authenticate. If the daemon stops, restart it with `cash start`.
+
+You can also pass a token explicitly: `cash init --api-url <url> --token <jwt> --ark-server <url>`.
 
 Or set environment variables:
 
-```
+```bash
 CLW_API_URL=https://api.clw.cash
 CLW_SESSION_TOKEN=<jwt>
 CLW_IDENTITY_ID=<uuid>

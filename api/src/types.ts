@@ -30,7 +30,7 @@ export interface AuditEvent {
   id: string;
   user_id: string;
   identity_id: string | null;
-  action: "user.create" | "session.create" | "identity.create" | "identity.sign" | "identity.destroy";
+  action: "user.create" | "session.create" | "identity.create" | "identity.restore" | "identity.sign" | "identity.destroy";
   metadata: Record<string, unknown>;
   created_at: string;
 }

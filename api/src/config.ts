@@ -25,4 +25,5 @@ export const config = {
   telegramBotToken: process.env.TELEGRAM_BOT_TOKEN ?? "",
   telegramBotUsername: process.env.TELEGRAM_BOT_USERNAME ?? "",
   challengeTtlSeconds: parseNumber(process.env.CHALLENGE_TTL_SECONDS, 300),
+  botApiKey: process.env.BOT_API_KEY ?? "",
 };

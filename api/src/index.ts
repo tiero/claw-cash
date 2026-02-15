@@ -10,6 +10,7 @@ import { InMemoryStore } from "./store.js";
 import { TelegramBot } from "./telegramBot.js";
 import type { Identity, SessionClaims, SupportedAlg } from "./types.js";
 import {
+  botSessionSchema,
   challengeRequestSchema,
   createIdentitySchema,
   normalizeDigestHex,
@@ -168,6 +169,46 @@ app.post("/v1/auth/verify", (req, res, next) => {
   }
 });
 
+app.post("/v1/auth/bot-session", (req, res, next) => {
+  try {
+    if (!config.botApiKey) {
+      throw new ApiError(501, "Bot sessions not configured (set BOT_API_KEY)");
+    }
+
+    const apiKey = req.header("x-bot-api-key");
+    if (!apiKey || apiKey !== config.botApiKey) {
+      throw new ApiError(401, "Invalid bot API key");
+    }
+
+    const body = parse(botSessionSchema, req.body);
+    const { user } = store.createOrGetUser(body.telegram_user_id);
+
+    const token = signSessionToken({
+      sub: user.id,
+      telegram_user_id: user.telegram_user_id,
+    });
+
+    store.addAuditEvent({
+      user_id: user.id,
+      identity_id: null,
+      action: "session.create",
+      metadata: { via: "bot-session" },
+    });
+
+    res.json({
+      token,
+      expires_in: config.sessionTtlSeconds,
+      user: {
+        id: user.id,
+        telegram_user_id: user.telegram_user_id,
+        status: user.status,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Identities ───────────────────────────────────────────
 
 app.post("/v1/identities", requireAuth, async (req: Request, res, next) => {
@@ -198,6 +239,58 @@ app.post("/v1/identities", requireAuth, async (req: Request, res, next) => {
       metadata: { alg: identity.alg }
     });
     res.status(201).json(identity);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/v1/identities/:id/restore", requireAuth, async (req: Request, res, next) => {
+  try {
+    const authReq = req as AuthenticatedRequest;
+    const user = currentUserFromRequest(authReq);
+    const identityId = req.params.id;
+
+    // Already registered — just ensure key is loaded in enclave
+    const existing = store.getIdentity(identityId);
+    if (existing) {
+      if (existing.user_id !== user.id) {
+        throw new ApiError(403, "Identity does not belong to session user");
+      }
+      await restoreFromBackupIfAvailable(identityId);
+      res.json(existing);
+      return;
+    }
+
+    // Must have a backup to restore from
+    const backup = store.getBackup(identityId);
+    if (!backup) {
+      throw new ApiError(404, "No backup found for this identity");
+    }
+
+    // Restore key into enclave
+    await enclaveClient.importKey(identityId, backup.alg, backup.sealed_key);
+
+    // Re-create the identity record; client provides the public key
+    const body = req.body as { public_key?: string };
+    if (!body.public_key) {
+      throw new ApiError(400, "Missing public_key in request body");
+    }
+
+    const identity = store.createIdentity({
+      id: identityId,
+      user_id: user.id,
+      alg: backup.alg,
+      public_key: body.public_key,
+    });
+
+    store.addAuditEvent({
+      user_id: user.id,
+      identity_id: identity.id,
+      action: "identity.restore",
+      metadata: { alg: identity.alg },
+    });
+
+    res.json(identity);
   } catch (error) {
     next(error);
   }

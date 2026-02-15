@@ -48,6 +48,12 @@ export async function handleLogin(): Promise<never> {
       body: JSON.stringify({ challenge_id: challenge.challenge_id }),
     });
 
+    // 202 = not yet resolved, keep polling (must check before .ok since 202 is "ok")
+    if (verifyRes.status === 202) {
+      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
+      continue;
+    }
+
     if (verifyRes.ok) {
       const session = (await verifyRes.json()) as {
         token: string;
@@ -98,12 +104,6 @@ export async function handleLogin(): Promise<never> {
         expiresIn: session.expires_in,
         daemon,
       });
-    }
-
-    // 202 = not yet resolved, keep polling
-    if (verifyRes.status === 202) {
-      await new Promise((r) => setTimeout(r, POLL_INTERVAL_MS));
-      continue;
     }
 
     const text = await verifyRes.text();

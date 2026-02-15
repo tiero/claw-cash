@@ -11,33 +11,44 @@ npm install -g clw-cash
 ## Quick Start
 
 ```bash
-# Initialize
-cash init
+# Initialize with API and Ark server
+cash init --api-url <url> --token <jwt> --ark-server <url>
 
-# Login via Telegram
+# Login via Telegram (refresh token)
 cash login
-
-# Create a new identity (keypair)
-cash create
 
 # Check balance
 cash balance
 
 # Send funds
-cash send <address> <amount>
+cash send --amount 100000 --currency btc --where arkade --to ark1q...
+cash send lnbc500n1...
+
+# Receive funds
+cash receive --amount 100000 --currency btc --where lightning
 ```
 
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `cash init` | Configure API endpoint |
-| `cash login` | Authenticate via Telegram |
-| `cash create` | Create a new identity keypair |
+| `cash init` | Configure API endpoint, token, and Ark server |
+| `cash login` | Re-authenticate via Telegram (refresh token) |
 | `cash balance` | Show wallet balance |
 | `cash send` | Send Bitcoin or stablecoins |
-| `cash receive` | Show receive address |
-| `cash daemon` | Start background monitor |
+| `cash receive` | Generate receive address/invoice |
+| `cash start` | Start background daemon (swap monitoring) |
+| `cash stop` | Stop background daemon |
+| `cash status` | Show daemon status |
+| `cash swap <id>` | Check swap status (local + LendaSat API) |
+| `cash swaps` | List swaps (last 5 per category) |
+| `cash claim <id>` | Manually claim a swap (reveal preimage) |
+| `cash refund <id>` | Manually refund a swap |
+
+### Supported currencies and networks
+
+- **Currency:** `btc`, `usdt`, `usdc`
+- **Where:** `onchain`, `lightning`, `arkade`, `polygon`, `arbitrum`, `ethereum`
 
 ## How It Works
 

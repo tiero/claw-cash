@@ -7,5 +7,5 @@ export default defineConfig({
   platform: "node",
   clean: true,
   banner: { js: "#!/usr/bin/env node" },
-  noExternal: ["@clw-cash/sdk", "@clw-cash/skills", "@lendasat/lendaswap-sdk-pure"],
+  noExternal: ["@clw-cash/sdk", "@clw-cash/skills", "@lendasat/lendaswap-sdk-pure", "@noble/hashes"],
 });

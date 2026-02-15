@@ -1,5 +1,3 @@
-#!/usr/bin/env node
-
 import minimist from "minimist";
 import { loadConfig, validateConfig, getSessionStatus, saveConfig } from "./config.js";
 import { createContext } from "./context.js";

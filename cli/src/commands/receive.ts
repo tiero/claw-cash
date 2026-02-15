@@ -22,14 +22,40 @@ export async function handleReceive(
   if (!currency) {
     return outputError("Missing --currency <btc|usdt|usdc>");
   }
-  if (!where) {
-    return outputError("Missing --where <onchain|lightning|arkade|polygon|arbitrum|ethereum>");
-  }
 
   if (!isValidCurrency(currency)) {
     return outputError(
       `Invalid currency: ${currency}. Expected: btc, usdt, usdc`
     );
+  }
+
+  // Stablecoins: --where is optional (sender picks chain on web page)
+  if (currency !== "btc" && !where) {
+    if (!amountStr) {
+      return outputError(
+        `Missing --amount <${currency}> (e.g. --amount 10 for 10 ${currency.toUpperCase()})`
+      );
+    }
+    const amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) {
+      return outputError(`Invalid amount: ${amountStr}`);
+    }
+
+    // Generate payment URL — sender chooses chain on the web page
+    const arkAddress = await ctx.bitcoin.getArkAddress();
+    const apiBaseUrl = config.apiBaseUrl;
+    const paymentUrl = `${apiBaseUrl}/pay?amount=${amount}&to=${arkAddress}&currency=${currency}`;
+
+    return outputSuccess({
+      paymentUrl,
+      amount,
+      currency,
+      targetAddress: arkAddress,
+    });
+  }
+
+  if (!where) {
+    return outputError("Missing --where <onchain|lightning|arkade|polygon|arbitrum|ethereum>");
   }
 
   if (!isValidWhere(where)) {

@@ -1,5 +1,6 @@
 import { loadConfig, saveConfig } from "../config.js";
 import { outputSuccess, outputError } from "../output.js";
+import { getDaemonStatus, stopDaemon, startDaemonInBackground, getPort } from "../daemon.js";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
@@ -76,10 +77,26 @@ export async function handleLogin(): Promise<never> {
         }
       }
 
+      // Restart daemon if it was running (so it picks up the new token)
+      const daemonStatus = getDaemonStatus();
+      let daemon: { restarted: boolean; pid?: number; port?: number } = { restarted: false };
+      if (daemonStatus.running) {
+        console.error("Restarting daemon with new session...");
+        await stopDaemon();
+        try {
+          const port = getPort();
+          const { pid } = await startDaemonInBackground(port);
+          daemon = { restarted: true, pid, port };
+        } catch (err) {
+          console.error(`Warning: daemon restart failed: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+
       return outputSuccess({
         message: "Logged in successfully",
         userId: session.user.id,
         expiresIn: session.expires_in,
+        daemon,
       });
     }
 

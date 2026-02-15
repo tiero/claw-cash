@@ -1,7 +1,7 @@
 import type { StablecoinToken, EvmChain } from "@clw-cash/skills";
 
 const TOKEN_MAP: Record<string, Record<string, StablecoinToken>> = {
-  usdt: { polygon: "usdt_pol", ethereum: "usdt_eth", arbitrum: "usdt_arb" },
+  usdt: { polygon: "usdt0_pol", ethereum: "usdt_eth", arbitrum: "usdt_arb" },
   usdc: { polygon: "usdc_pol", ethereum: "usdc_eth", arbitrum: "usdc_arb" },
 };
 

@@ -1,9 +1,9 @@
 import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
-import { parseParams } from "./params.js";
+import { parseParams, CURRENCY_CHAIN_TO_TOKEN } from "./params.js";
 import { connectWallet } from "./wallet.js";
 import { createSwap, getFundingCallData, pollSwapStatus } from "./swap.js";
-import { renderPage, setStep, setStatus, setEnsName, setSender, showError } from "./ui.js";
+import { renderPage, setStep, setStatus, setEnsName, setSender, selectChain, showError, updateDebug } from "./ui.js";
 import "./style.css";
 
 async function main() {
@@ -45,12 +45,30 @@ async function main() {
         });
     }
 
+    // Chain selection: sender picks which chain to pay on
+    let selectedChain = params.chain;
+    let selectedToken = params.token;
+
+    if (params.needsChainSelection) {
+      document.querySelectorAll(".chain-option").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const chain = (btn as HTMLElement).dataset.chain!;
+          const tokenMap = CURRENCY_CHAIN_TO_TOKEN[params.currency!];
+          if (!tokenMap) return;
+          selectedChain = chain;
+          selectedToken = tokenMap[chain];
+          selectChain(chain, selectedToken);
+        });
+      });
+    }
+
     document.getElementById("connect-btn")!.addEventListener("click", async () => {
       try {
         // 1. Connect wallet
         setStep("connecting");
-        const { walletClient, publicClient, address } = await connectWallet(params.chain);
+        const { walletClient, publicClient, address } = await connectWallet(selectedChain);
         setSender(address);
+        updateDebug({ sender: address, chain: selectedChain, token: selectedToken });
 
         let approveTo: string;
         let approveData: string;
@@ -66,13 +84,15 @@ async function main() {
           fundData = params.funding.fundData;
           swapId = params.swapId;
         } else {
-          // Legacy flow: web creates the swap and fetches call data
+          // Web creates the swap (chain selected by sender or from URL)
           setStep("creating-swap");
-          const swapResult = await createSwap(params, address);
+          const swapParams = { ...params, chain: selectedChain, token: selectedToken };
+          const swapResult = await createSwap(swapParams, address);
           swapId = swapResult.response.id;
+          updateDebug({ swapId });
 
           setStep("preparing-tx");
-          const callData = await getFundingCallData(swapId, params.token);
+          const callData = await getFundingCallData(swapId, selectedToken);
           approveTo = callData.approve.to;
           approveData = callData.approve.data;
           fundTo = callData.createSwap.to;
@@ -88,6 +108,7 @@ async function main() {
           chain: walletClient.chain,
         });
         await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+        updateDebug({ approveTx: approveTxHash });
 
         // 3. Fund the swap
         setStep("fund");
@@ -98,13 +119,13 @@ async function main() {
           chain: walletClient.chain,
         });
         await publicClient.waitForTransactionReceipt({ hash: fundTxHash });
+        updateDebug({ fundTx: fundTxHash });
 
-        // 4. Done — CLI daemon handles claiming
+        // 4. Done — poll LendaSwap for completion
         if (params.funding) {
-          // Pre-created swap: no need to poll API, the CLI daemon claims automatically
+          // Pre-created swap: CLI daemon claims automatically
           setStep("done");
         } else if (swapId) {
-          // Legacy: poll LendaSwap API for completion
           setStep("waiting");
           const success = await pollSwapStatus(swapId, (status) => {
             setStatus(status);

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import minimist from "minimist";
-import { loadConfig, validateConfig } from "./config.js";
+import { loadConfig, validateConfig, getSessionStatus, saveConfig } from "./config.js";
 import { createContext } from "./context.js";
 import { outputError } from "./output.js";
 import { handleSend } from "./commands/send.js";
@@ -15,6 +15,7 @@ import { handleSwaps } from "./commands/swaps.js";
 import { handleClaim } from "./commands/claim.js";
 import { handleRefund } from "./commands/refund.js";
 import { handleLogin } from "./commands/login.js";
+import { handleSwap } from "./commands/swap.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -29,6 +30,7 @@ Usage:
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
   cash status                 Show daemon status
+  cash swap <swapId>            Check swap status (local + LendaSat API)
   cash swaps                  List swaps (last 5 per category)
     --pending --claimed --refunded --expired --failed  (filter)
     --limit <n>                 Max per category (default: 5)
@@ -114,6 +116,16 @@ async function main() {
       outputError(configError);
     }
 
+    // Check session expiry and auto re-login if expired
+    const session = getSessionStatus(config.sessionToken);
+    if (!session.active) {
+      console.error("Session expired. Re-authenticating...");
+      const freshToken = await refreshSession(config);
+      config.sessionToken = freshToken;
+      saveConfig(config);
+      console.error("Session refreshed.");
+    }
+
     const ctx = await createContext(config);
 
     switch (command) {
@@ -125,6 +137,9 @@ async function main() {
         break;
       case "balance":
         await handleBalance(ctx);
+        break;
+      case "swap":
+        await handleSwap(ctx, argv);
         break;
       case "swaps":
         await handleSwaps(ctx, argv);
@@ -142,6 +157,87 @@ async function main() {
     const message = err instanceof Error ? err.message : String(err);
     outputError(message);
   }
+}
+
+async function refreshSession(config: import("./config.js").CashConfig): Promise<string> {
+  const { getDaemonStatus, stopDaemon, startDaemonInBackground, getPort } = await import("./daemon.js");
+
+  // Request a challenge (auto-resolves in test mode)
+  const challengeRes = await fetch(`${config.apiBaseUrl}/v1/auth/challenge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ telegram_user_id: "test_user" }),
+  });
+  if (!challengeRes.ok) {
+    throw new Error(`Auth challenge failed: ${await challengeRes.text()}`);
+  }
+
+  const challenge = (await challengeRes.json()) as {
+    challenge_id: string;
+    deep_link: string | null;
+  };
+
+  if (challenge.deep_link) {
+    console.error(`Open this link to authenticate:\n\n  ${challenge.deep_link}\n`);
+    console.error("Waiting for confirmation...");
+  }
+
+  // Poll verify (120s timeout)
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const verifyRes = await fetch(`${config.apiBaseUrl}/v1/auth/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ challenge_id: challenge.challenge_id }),
+    });
+
+    if (verifyRes.ok) {
+      const session = (await verifyRes.json()) as { token: string };
+      const token = session.token;
+
+      // Restore identity with fresh token
+      if (config.identityId && config.publicKey) {
+        const restoreRes = await fetch(
+          `${config.apiBaseUrl}/v1/identities/${config.identityId}/restore`,
+          {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({ public_key: config.publicKey }),
+          }
+        );
+        if (!restoreRes.ok) {
+          console.error(`Warning: identity restore failed: ${await restoreRes.text()}`);
+        }
+      }
+
+      // Restart daemon if running (so it picks up the new token)
+      const daemonStatus = getDaemonStatus();
+      if (daemonStatus.running) {
+        console.error("Restarting daemon with new session...");
+        await stopDaemon();
+        try {
+          const port = getPort();
+          await startDaemonInBackground(port);
+        } catch (err) {
+          console.error(`Warning: daemon restart failed: ${err instanceof Error ? err.message : err}`);
+        }
+      }
+
+      return token;
+    }
+
+    if (verifyRes.status === 202) {
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+
+    throw new Error(`Auth verify failed: ${await verifyRes.text()}`);
+  }
+
+  throw new Error("Re-authentication timed out");
 }
 
 async function runDaemon() {

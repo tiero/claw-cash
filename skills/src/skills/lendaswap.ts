@@ -27,7 +27,7 @@ export const TOKEN_DECIMALS: Record<string, number> = {
   usdc_pol: 6,
   usdc_eth: 6,
   usdc_arb: 6,
-  usdt_pol: 6,
+  usdt0_pol: 6,
   usdt_eth: 6,
   usdt_arb: 6,
 };
@@ -240,6 +240,7 @@ export class LendaSwapSkill implements StablecoinSwapSkill {
       },
       expiresAt: new Date(resp.vhtlc_refund_locktime * 1000),
       paymentDetails: { address: resp.htlc_address_arkade },
+      htlcAddressEvm: resp.htlc_address_evm,
       fundingTxid,
     };
   }
@@ -284,6 +285,7 @@ export class LendaSwapSkill implements StablecoinSwapSkill {
         address: resp.htlc_address_evm,
         callData: resp.source_token_address,
       },
+      htlcAddressEvm: resp.htlc_address_evm,
     };
   }
 

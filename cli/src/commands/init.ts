@@ -1,15 +1,14 @@
 import { ClwApiClient } from "@clw-cash/sdk";
-import { loadConfig, saveConfig, type CashConfig } from "../config.js";
+import { loadConfig, saveConfig, getSessionStatus, type CashConfig } from "../config.js";
 import { outputSuccess } from "../output.js";
 import { getPort, startDaemonInBackground } from "../daemon.js";
 import type { ParsedArgs } from "minimist";
 
 async function authenticate(config: CashConfig): Promise<string> {
-  // Request a challenge (auto-resolves in test mode with telegram_user_id)
   const challengeRes = await fetch(`${config.apiBaseUrl}/v1/auth/challenge`, {
     method: "POST",
     headers: { "content-type": "application/json" },
-    body: JSON.stringify({ telegram_user_id: "test_user" }),
+    body: JSON.stringify({}),
   });
   if (!challengeRes.ok) {
     throw new Error(`Challenge failed: ${await challengeRes.text()}`);
@@ -76,8 +75,8 @@ export async function handleInit(args: ParsedArgs): Promise<never> {
     network: args.network as string | undefined,
   });
 
-  // Auto-login if no token provided
-  if (!config.sessionToken) {
+  // Auto-login if no token or token expired
+  if (!config.sessionToken || !getSessionStatus(config.sessionToken).active) {
     config.sessionToken = await authenticate(config);
   }
 

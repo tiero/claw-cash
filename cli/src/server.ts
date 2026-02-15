@@ -3,6 +3,18 @@ import type { CashContext } from "./context.js";
 import type { SwapMonitor } from "./monitor.js";
 import type { EvmChain, StablecoinToken, StablecoinSwapInfo, StablecoinSwapStatus } from "@clw-cash/skills";
 
+const LENDASWAP_API = "https://apilendaswap.lendasat.com";
+
+async function fetchRemoteSwap(swapId: string): Promise<Record<string, unknown> | null> {
+  try {
+    const res = await fetch(`${LENDASWAP_API}/swap/${encodeURIComponent(swapId)}`);
+    if (!res.ok) return null;
+    return (await res.json()) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
 const CATEGORY_MAP: Record<StablecoinSwapStatus, string> = {
   pending: "pending",
   awaiting_funding: "pending",
@@ -104,6 +116,39 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
         const lendaswap = groupSwaps(lendaSwaps, categories, limit);
 
         return json(res, 200, { lendaswap });
+      }
+
+      // GET /swaps/:id — single swap status (local + remote)
+      if (method === "GET" && url.pathname.startsWith("/swaps/") && url.pathname.split("/").length === 3) {
+        const swapId = url.pathname.split("/")[2];
+        if (!swapId) {
+          return json(res, 400, { error: "Missing swap ID" });
+        }
+
+        const [local, remote] = await Promise.all([
+          ctx.swap.getSwapStatus(swapId).catch(() => null),
+          fetchRemoteSwap(swapId),
+        ]);
+
+        if (!local && !remote) {
+          return json(res, 404, { error: `Swap ${swapId} not found` });
+        }
+
+        const result: Record<string, unknown> = { id: swapId };
+        if (local) {
+          result.local = local;
+          result.status = local.status;
+          result.direction = local.direction;
+        }
+        if (remote) {
+          result.remote = remote;
+          if (!local) {
+            result.status = remote.status;
+            result.direction = remote.direction;
+          }
+        }
+
+        return json(res, 200, result);
       }
 
       // POST /swaps/:id/claim

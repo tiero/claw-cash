@@ -170,7 +170,7 @@ export type StablecoinToken =
   | "usdc_pol"
   | "usdc_eth"
   | "usdc_arb"
-  | "usdt_pol"
+  | "usdt0_pol"
   | "usdt_eth"
   | "usdt_arb";
 
@@ -209,6 +209,7 @@ export interface StablecoinSwapResult {
     address: string;
     callData?: string;
   };
+  htlcAddressEvm?: string;
   fundingTxid?: string;
 }
 

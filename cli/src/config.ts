@@ -73,3 +73,36 @@ export function validateConfig(config: CashConfig): string | null {
   if (!config.arkServerUrl) return "Missing arkServerUrl (set CLW_ARK_SERVER_URL)";
   return null;
 }
+
+export interface SessionStatus {
+  active: boolean;
+  expiresAt: string | null;
+  remainingSeconds: number | null;
+}
+
+/** Decode JWT payload without verification to check expiry locally */
+export function getSessionStatus(token: string): SessionStatus {
+  if (!token) return { active: false, expiresAt: null, remainingSeconds: null };
+
+  try {
+    const parts = token.split(".");
+    if (parts.length !== 3) return { active: false, expiresAt: null, remainingSeconds: null };
+
+    const payload = JSON.parse(
+      Buffer.from(parts[1], "base64url").toString("utf-8")
+    ) as { exp?: number };
+
+    if (!payload.exp) return { active: true, expiresAt: null, remainingSeconds: null };
+
+    const expiresAt = new Date(payload.exp * 1000);
+    const remainingSeconds = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+
+    return {
+      active: remainingSeconds > 0,
+      expiresAt: expiresAt.toISOString(),
+      remainingSeconds: Math.max(0, remainingSeconds),
+    };
+  } catch {
+    return { active: false, expiresAt: null, remainingSeconds: null };
+  }
+}

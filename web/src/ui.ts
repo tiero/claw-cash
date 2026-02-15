@@ -1,20 +1,13 @@
 import type { PaymentParams } from "./params.js";
-import { TOKEN_LABELS, CHAIN_LABELS, CHAIN_COLORS, TOKEN_COLORS } from "./params.js";
+import { TOKEN_LABELS, CHAIN_LABELS, CHAIN_COLORS, TOKEN_COLORS, SUPPORTED_CHAINS, TOKEN_LOGOS, CURRENCY_LOGOS } from "./params.js";
 
 // ── Icons ──
 
 const COPY_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>`;
 const CHECK_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`;
+const ARROW_SVG = `<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>`;
+const INFO_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>`;
 
-// Arkade logo — pixelated "A" arcade robot (traced from brand asset)
-const ARKADE_LOGO = `<svg width="20" height="20" viewBox="0 0 36 36" fill="currentColor">
-  <path d="M6 14 L6 6 Q6 2 10 2 L26 2 Q30 2 30 6 L30 14 L24 14 L24 8 L12 8 L12 14 Z"/>
-  <rect x="12" y="16" width="12" height="8" rx="1"/>
-  <rect x="6" y="28" width="8" height="6" rx="1"/>
-  <rect x="22" y="28" width="8" height="6" rx="1"/>
-</svg>`;
-
-// Small version for footer
 const ARKADE_LOGO_SM = `<svg width="12" height="12" viewBox="0 0 36 36" fill="currentColor">
   <path d="M6 14 L6 6 Q6 2 10 2 L26 2 Q30 2 30 6 L30 14 L24 14 L24 8 L12 8 L12 14 Z"/>
   <rect x="12" y="16" width="12" height="8" rx="1"/>
@@ -27,70 +20,24 @@ const ARKADE_LOGO_SM = `<svg width="12" height="12" viewBox="0 0 36 36" fill="cu
 interface StepInfo {
   title: string;
   desc: string;
-  phase: 1 | 2;
+  progress: number; // 0-100
   explainer?: string;
 }
 
 const STEPS: Record<string, StepInfo> = {
-  loading: {
-    title: "Loading\u2026",
-    desc: "fetching payment details",
-    phase: 1,
-  },
-  "already-paid": {
-    title: "Already paid",
-    desc: "this payment link has already been used",
-    phase: 2,
-  },
-  "link-expired": {
-    title: "Link expired",
-    desc: "this payment link is no longer valid",
-    phase: 2,
-  },
-  connecting: {
-    title: "Connecting wallet\u2026",
-    desc: "approve the connection in your wallet",
-    phase: 1,
-  },
-  "creating-swap": {
-    title: "Preparing your swap\u2026",
-    desc: "hang tight, setting things up",
-    phase: 2,
-  },
-  "preparing-tx": {
-    title: "Building transactions\u2026",
-    desc: "almost there",
-    phase: 2,
-  },
-  approve: {
-    title: "Approve token spend",
-    desc: "your wallet needs a quick ok",
-    phase: 2,
-    explainer:
-      "A popup will ask to approve token spending. This is a standard ERC-20 permission \u2014 no funds leave your wallet yet.",
-  },
-  fund: {
-    title: "Confirm payment",
-    desc: "last step, send it",
-    phase: 2,
-    explainer:
-      "Your wallet will confirm the actual payment. This sends stablecoins to complete the swap \u2192 bitcoin.",
-  },
-  waiting: {
-    title: "Processing\u2026",
-    desc: "waiting for on-chain confirmation",
-    phase: 2,
-  },
-  done: {
-    title: "Sent!",
-    desc: "bitcoin is on its way",
-    phase: 2,
-  },
-  failed: {
-    title: "Failed",
-    desc: "swap expired or hit an error",
-    phase: 2,
-  },
+  loading:        { title: "Loading\u2026",            desc: "fetching payment details",           progress: 0 },
+  "already-paid": { title: "Already paid",             desc: "This payment link has been used",    progress: 100 },
+  "link-expired": { title: "Link expired",             desc: "This payment link is no longer valid", progress: 0 },
+  connecting:     { title: "Connecting\u2026",          desc: "Approve in your wallet",             progress: 15 },
+  "creating-swap":{ title: "Preparing swap\u2026",     desc: "Setting things up",                  progress: 30 },
+  "preparing-tx": { title: "Building tx\u2026",        desc: "Almost there",                       progress: 40 },
+  approve:        { title: "Approve spend",            desc: "Check your wallet",                  progress: 50,
+    explainer: "Your wallet will ask to approve token spending. This is a standard permission \u2014 no funds leave yet." },
+  fund:           { title: "Confirm payment",          desc: "Last step",                          progress: 70,
+    explainer: "Your wallet will confirm the payment. This sends stablecoins to complete the swap to bitcoin." },
+  waiting:        { title: "Processing\u2026",          desc: "Waiting for confirmation",           progress: 85 },
+  done:           { title: "Sent!",                    desc: "Bitcoin is on its way",              progress: 100 },
+  failed:         { title: "Failed",                   desc: "Swap expired or hit an error",       progress: 100 },
 };
 
 // ── Helpers ──
@@ -100,9 +47,17 @@ function truncAddr(addr: string): string {
   return `${addr.slice(0, 6)}\u2026${addr.slice(-4)}`;
 }
 
-function tokenDot(token: string): string {
+function tokenLogo(token: string): string {
+  const logo = TOKEN_LOGOS[token];
+  if (logo) return `<span class="token-logo">${logo}</span>`;
   const c = TOKEN_COLORS[token] ?? "#888";
   return `<span class="token-dot" style="background:${c}"></span>`;
+}
+
+function currencyLogo(currency: string): string {
+  const logo = CURRENCY_LOGOS[currency];
+  if (logo) return `<span class="token-logo">${logo}</span>`;
+  return "";
 }
 
 function chainDot(chain: string): string {
@@ -110,114 +65,106 @@ function chainDot(chain: string): string {
   return `<span class="chain-dot" style="background:${c}"></span>`;
 }
 
+// ── Layout parts ──
+
 function brandHeader(): string {
   return `
     <div class="brand-header">
-      <div class="brand-left">
-        <span class="brand-logo">${ARKADE_LOGO}</span>
-        <span class="brand-name">Arkade</span>
+      <div>
+        <div class="brand-name">Cash for Claws</div>
+        <div class="brand-tagline"><em>bots get bitcoins</em>, humans pay in stablecoins</div>
       </div>
-      <span class="brand-tag">Checkout</span>
+      <button class="debug-toggle" id="debug-toggle" title="Diagnostics">${INFO_SVG}</button>
     </div>`;
 }
 
 function footer(): string {
   return `
     <div class="footer">
-      <p class="footer-tagline">
-        <em>bots get bitcoins</em>, humans pay in stablecoins
-      </p>
       <p class="footer-powered">powered by <span class="footer-arkade">${ARKADE_LOGO_SM} Arkade</span></p>
+    </div>
+    <div class="debug-panel" id="debug-panel" hidden>
+      <div class="debug-title">Diagnostics</div>
+      <pre class="debug-content" id="debug-content"></pre>
     </div>`;
 }
 
-function stepIndicatorHtml(phase: 0 | 1 | 2, terminal?: "done" | "failed"): string {
-  const s1 = terminal || phase >= 2 ? "completed" : phase === 1 ? "active" : "inactive";
-  const s1c = s1 === "completed" ? CHECK_SVG : "1";
-  const lineC = terminal || phase >= 2 ? "completed" : "";
+function amountHtml(params: PaymentParams): string {
+  const cur = params.needsChainSelection
+    ? (params.currency ?? "").toUpperCase()
+    : (TOKEN_LABELS[params.token] ?? params.token);
 
-  let s2: string;
-  let s2c: string;
-  if (terminal === "done") { s2 = "completed"; s2c = CHECK_SVG; }
-  else if (terminal === "failed") { s2 = "error"; s2c = "!"; }
-  else if (phase === 2) { s2 = "active"; s2c = "2"; }
-  else { s2 = "inactive"; s2c = "2"; }
+  const logo = params.needsChainSelection
+    ? currencyLogo(params.currency ?? "")
+    : tokenLogo(params.token);
 
-  const l1 = phase >= 1 || terminal ? "active" : "";
-  const l2 = phase >= 2 || terminal ? "active" : "";
+  let meta = "";
+  if (!params.needsChainSelection && params.chain) {
+    const chainLabel = CHAIN_LABELS[params.chain] ?? params.chain;
+    meta = `
+      <div class="amount-meta">
+        ${tokenLogo(params.token)} ${cur}
+        <span class="meta-sep">\u00B7</span>
+        ${chainDot(params.chain)} ${chainLabel}
+      </div>`;
+  }
 
   return `
-    <div class="step-indicator">
-      <div class="step-node">
-        <div class="step-circle ${s1}">${s1c}</div>
-        <span class="step-label ${l1}">Connect</span>
+    <div class="amount-section">
+      <div class="amount-value">${logo} ${params.amount}<span class="amount-currency">${cur}</span></div>
+      ${meta}
+    </div>`;
+}
+
+function chainPickerHtml(): string {
+  const items = SUPPORTED_CHAINS.map((c) => {
+    const color = CHAIN_COLORS[c] ?? "#888";
+    return `
+      <button class="chain-option" data-chain="${c}">
+        <span class="chain-dot" style="background:${color}"></span>
+        ${CHAIN_LABELS[c] ?? c}
+      </button>`;
+  }).join("");
+
+  return `
+    <div class="chain-picker">
+      <div class="chain-picker-label">Pay on</div>
+      <div class="chain-picker-options">${items}</div>
+    </div>`;
+}
+
+function recipientHtml(params: PaymentParams): string {
+  return `
+    <div class="recipient-section" id="recipient-section">
+      <div class="recipient-left">
+        <div class="recipient-avatar">\uD83E\uDD16</div>
+        <div class="recipient-info">
+          <div class="recipient-label">To</div>
+          <div id="ens-name" class="recipient-ens" hidden></div>
+          <div class="recipient-address" id="address-display">${truncAddr(params.to)}</div>
+        </div>
       </div>
-      <div class="step-line ${lineC}"></div>
-      <div class="step-node">
-        <div class="step-circle ${s2}">${s2c}</div>
-        <span class="step-label ${l2}">Pay</span>
-      </div>
+      <button class="copy-btn" id="copy-btn" title="Copy address">${COPY_SVG}</button>
     </div>`;
 }
 
 // ── Render ──
 
 export function renderPage(params: PaymentParams) {
-  const tok = TOKEN_LABELS[params.token] ?? params.token;
-  const chain = CHAIN_LABELS[params.chain] ?? params.chain;
+  const showChainPicker = !!params.needsChainSelection;
 
   document.getElementById("app")!.innerHTML = `
     <div class="checkout-card">
-
       ${brandHeader()}
+      ${amountHtml(params)}
+      ${showChainPicker ? chainPickerHtml() : ""}
+      ${recipientHtml(params)}
 
-      <div class="amount-hero">
-        <div class="amount-value">${params.amount}</div>
-        <div class="amount-meta">
-          <span class="amount-token">
-            ${tokenDot(params.token)}
-            ${tok}
-          </span>
-          <span class="meta-sep">\u00B7</span>
-          <span class="chain-pill">
-            ${chainDot(params.chain)}
-            ${chain}
-          </span>
-        </div>
-      </div>
-
-      <div id="transfer-section" class="transfer-section">
-        <div id="sender-row" class="transfer-row" hidden>
-          <div class="transfer-left">
-            <div class="transfer-avatar sender-avatar" id="sender-avatar">\uD83D\uDC64</div>
-            <div class="transfer-info">
-              <div class="transfer-label">From</div>
-              <div class="address-text" id="sender-display"></div>
-            </div>
-          </div>
-        </div>
-        <div id="transfer-arrow" class="transfer-arrow" hidden>
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-        </div>
-        <div class="transfer-row">
-          <div class="transfer-left">
-            <div class="transfer-avatar">\uD83E\uDD16</div>
-            <div class="transfer-info">
-              <div class="transfer-label">To</div>
-              <div id="ens-name" class="ens-name" hidden></div>
-              <div class="address-text" id="address-display">${truncAddr(params.to)}</div>
-            </div>
-          </div>
-          <button class="copy-btn" id="copy-btn" title="Copy address">${COPY_SVG}</button>
-        </div>
-      </div>
-
-      ${stepIndicatorHtml(0)}
-
+      <div id="sender-area"></div>
+      <div id="progress-area"></div>
       <div id="action-area" class="action-area">
-        <button class="action-btn" id="connect-btn">Connect Wallet & Pay</button>
+        <button class="action-btn" id="connect-btn" ${showChainPicker ? "disabled" : ""}>Connect Wallet & Pay</button>
       </div>
-
       <div id="explainer-area"></div>
       <div id="error-area"></div>
 
@@ -232,35 +179,81 @@ export function renderPage(params: PaymentParams) {
       const btn = document.getElementById("copy-btn")!;
       btn.innerHTML = CHECK_SVG;
       btn.classList.add("copied");
-      setTimeout(() => {
-        btn.innerHTML = COPY_SVG;
-        btn.classList.remove("copied");
-      }, 1500);
+      setTimeout(() => { btn.innerHTML = COPY_SVG; btn.classList.remove("copied"); }, 1500);
     });
+  });
+
+  // Debug toggle
+  document.getElementById("debug-toggle")!.addEventListener("click", () => {
+    const panel = document.getElementById("debug-panel")!;
+    panel.hidden = !panel.hidden;
+  });
+
+  // Initial debug data
+  updateDebug({
+    swapId: params.swapId ?? null,
+    token: params.token || null,
+    chain: params.chain || null,
+    currency: params.currency ?? null,
+    amount: params.amount,
+    to: params.to,
+    status: params.status,
+    hasFunding: !!params.funding,
+    needsChainSelection: !!params.needsChainSelection,
+    url: window.location.href,
   });
 }
 
-// ── Step Updates ──
+// ── Chain selection ──
+
+export function selectChain(chain: string, token: string) {
+  // Update amount meta
+  const section = document.querySelector(".amount-section");
+  if (section) {
+    const existing = section.querySelector(".amount-meta");
+    const chainLabel = CHAIN_LABELS[chain] ?? chain;
+    const tok = TOKEN_LABELS[token] ?? token;
+    const html = `
+      <div class="amount-meta">
+        ${tokenLogo(token)} ${tok}
+        <span class="meta-sep">\u00B7</span>
+        ${chainDot(chain)} ${chainLabel}
+      </div>`;
+    if (existing) {
+      existing.outerHTML = html;
+    } else {
+      section.insertAdjacentHTML("beforeend", html);
+    }
+  }
+
+  // Highlight selected
+  document.querySelectorAll(".chain-option").forEach((btn) => {
+    btn.classList.toggle("selected", (btn as HTMLElement).dataset.chain === chain);
+  });
+
+  // Enable button
+  const connectBtn = document.getElementById("connect-btn") as HTMLButtonElement | null;
+  if (connectBtn) connectBtn.disabled = false;
+}
+
+// ── Step updates ──
 
 export function setStep(step: string) {
   const info = STEPS[step];
   if (!info) return;
 
-  // Loading step: show before page is rendered (no card yet)
+  // Loading: before page renders
   if (step === "loading") {
     const app = document.getElementById("app");
     if (app && !document.querySelector(".checkout-card")) {
       app.innerHTML = `
         <div class="checkout-card">
           ${brandHeader()}
-          <div class="status-message">
+          <div class="status-area">
             <p class="status-title">${info.title}</p>
-            <p class="status-description">${info.desc}</p>
+            <p class="status-desc">${info.desc}</p>
           </div>
-          <button class="action-btn" disabled>
-            <span class="spinner"></span>
-            ${info.title}
-          </button>
+          <button class="action-btn" disabled><span class="spinner"></span> ${info.title}</button>
           ${footer()}
         </div>`;
     }
@@ -270,13 +263,45 @@ export function setStep(step: string) {
   const card = document.querySelector(".checkout-card");
   if (!card) return;
 
-  // Swap step indicator
-  const old = card.querySelector(".step-indicator");
-  if (old) {
-    const t = step === "done" || step === "already-paid" ? "done" : step === "failed" || step === "link-expired" ? "failed" : undefined;
-    const wrap = document.createElement("div");
-    wrap.innerHTML = stepIndicatorHtml(info.phase, t as "done" | "failed" | undefined);
-    old.replaceWith(wrap.firstElementChild!);
+  // Terminal states: hide amount + recipient, show only the result
+  const isTerminal = step === "already-paid" || step === "link-expired" || step === "failed";
+  const amountEl = card.querySelector(".amount-section") as HTMLElement | null;
+  const recipientEl = document.getElementById("recipient-section") as HTMLElement | null;
+  const chainPicker = card.querySelector(".chain-picker") as HTMLElement | null;
+  if (amountEl) amountEl.style.display = isTerminal ? "none" : "";
+  if (recipientEl) recipientEl.style.display = isTerminal ? "none" : "";
+  if (chainPicker) chainPicker.style.display = isTerminal ? "none" : "";
+
+  // Progress bar — animate towards target over ~60s, pulsing while in progress
+  const progArea = document.getElementById("progress-area")!;
+  const shouldShow = info.progress > 0 && !isTerminal && step !== "done";
+  if (shouldShow) {
+    let fill = progArea.querySelector(".progress-fill") as HTMLElement | null;
+    if (!fill) {
+      progArea.innerHTML = `<div class="progress-bar"><div class="progress-fill"></div></div>`;
+      fill = progArea.querySelector(".progress-fill") as HTMLElement;
+    }
+    // Start from 0 width, then animate to target on next frame
+    requestAnimationFrame(() => {
+      fill!.classList.remove("instant");
+      fill!.classList.add("animating");
+      fill!.style.width = `${info.progress}%`;
+    });
+  } else if (step === "done") {
+    // Snap to 100% quickly on success
+    const fill = progArea.querySelector(".progress-fill") as HTMLElement | null;
+    if (fill) {
+      fill.classList.remove("animating");
+      fill.classList.add("instant");
+      fill.style.width = "100%";
+      fill.style.animation = "none";
+      // Remove bar after transition
+      setTimeout(() => { progArea.innerHTML = ""; }, 500);
+    } else {
+      progArea.innerHTML = "";
+    }
+  } else {
+    progArea.innerHTML = "";
   }
 
   // Action area
@@ -286,43 +311,43 @@ export function setStep(step: string) {
     area.innerHTML = `
       <div class="result-area">
         <div class="result-icon success">${CHECK_SVG}</div>
-        <p class="status-title success">${info.title}</p>
-        <p class="status-description">${info.desc}</p>
-      </div>`;
-  } else if (step === "failed" || step === "link-expired") {
-    area.innerHTML = `
-      <div class="result-area">
-        <div class="result-icon error">!</div>
-        <p class="status-title error">${info.title}</p>
-        <p class="status-description">${info.desc}</p>
+        <p class="result-title">${info.title}</p>
+        <p class="result-desc">${info.desc}</p>
       </div>`;
   } else if (step === "already-paid") {
     area.innerHTML = `
       <div class="result-area">
         <div class="result-icon success">${CHECK_SVG}</div>
-        <p class="status-title success">${info.title}</p>
-        <p class="status-description">${info.desc}</p>
+        <p class="result-title">${info.title}</p>
+        <p class="result-desc">${info.desc}</p>
+      </div>`;
+  } else if (step === "failed" || step === "link-expired") {
+    area.innerHTML = `
+      <div class="result-area">
+        <div class="result-icon muted">!</div>
+        <p class="result-title">${info.title}</p>
+        <p class="result-desc">${info.desc}</p>
       </div>`;
   } else {
     area.innerHTML = `
-      <div class="status-message">
+      <div class="status-area">
         <p class="status-title">${info.title}</p>
-        <p class="status-description">${info.desc}</p>
+        <p class="status-desc">${info.desc}</p>
       </div>
-      <button class="action-btn" disabled>
-        <span class="spinner"></span>
-        ${info.title}
-      </button>`;
+      <button class="action-btn" disabled><span class="spinner"></span> ${info.title}</button>`;
   }
+
+  // Log to debug
+  updateDebug({ step, progress: info.progress });
 
   // Explainer
   const explArea = document.getElementById("explainer-area")!;
   if (info.explainer) {
     explArea.innerHTML = `
-      <div class="popup-explainer">
+      <div class="explainer">
         <span class="explainer-icon">\uD83D\uDC46</span>
-        <div class="explainer-content">
-          <p class="explainer-title">wallet popup incoming</p>
+        <div>
+          <p class="explainer-title">Wallet popup incoming</p>
           <p class="explainer-text">${info.explainer}</p>
         </div>
       </div>`;
@@ -343,14 +368,16 @@ export function setStatus(rawStatus: string) {
 }
 
 export function setSender(address: string) {
-  const row = document.getElementById("sender-row");
-  const arrow = document.getElementById("transfer-arrow");
-  const display = document.getElementById("sender-display");
-  if (row && arrow && display) {
-    display.textContent = truncAddr(address);
-    row.hidden = false;
-    arrow.hidden = false;
-  }
+  const area = document.getElementById("sender-area")!;
+  area.innerHTML = `
+    <div class="sender-section">
+      <div class="sender-avatar">\uD83D\uDC64</div>
+      <div>
+        <div class="recipient-label">From</div>
+        <div class="recipient-address">${truncAddr(address)}</div>
+      </div>
+    </div>
+    <div class="transfer-arrow">${ARROW_SVG}</div>`;
 }
 
 export function setEnsName(name: string) {
@@ -370,6 +397,18 @@ export function showError(msg: string) {
       <div class="checkout-card">
         ${brandHeader()}
         <div class="error-box"><p class="error-text">${msg}</p></div>
+        ${footer()}
       </div>`;
   }
+  updateDebug({ error: msg });
+}
+
+// ── Debug panel ──
+
+const debugState: Record<string, unknown> = {};
+
+export function updateDebug(data: Record<string, unknown>) {
+  Object.assign(debugState, data);
+  const el = document.getElementById("debug-content");
+  if (el) el.textContent = JSON.stringify(debugState, null, 2);
 }

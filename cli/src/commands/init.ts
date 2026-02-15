@@ -33,17 +33,18 @@ async function authenticate(config: CashConfig): Promise<string> {
       body: JSON.stringify({ challenge_id: challenge.challenge_id }),
     });
 
+    // 202 = not yet resolved, keep polling (must check before .ok since 202 is "ok")
+    if (verifyRes.status === 202) {
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+
     if (verifyRes.ok) {
       const session = (await verifyRes.json()) as {
         token: string;
         expires_in: number;
       };
       return session.token;
-    }
-
-    if (verifyRes.status === 202) {
-      await new Promise((r) => setTimeout(r, 2000));
-      continue;
     }
 
     throw new Error(`Verify failed: ${await verifyRes.text()}`);

@@ -1,3 +1,5 @@
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import express, { type NextFunction, type Request, type Response } from "express";
 import jwt from "jsonwebtoken";
 import { v4 as uuidv4 } from "uuid";
@@ -25,6 +27,11 @@ type AuthenticatedRequest = Request & { auth: SessionClaims };
 
 const app = express();
 app.use(express.json({ limit: "32kb" }));
+
+// Serve payment page static files
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const webDistPath = process.env.WEB_DIST_PATH || path.resolve(__dirname, "../../web/dist");
+app.use("/pay", express.static(webDistPath));
 
 const store = new InMemoryStore(config.backupFilePath);
 const enclaveClient = new EnclaveClient(config.enclaveBaseUrl, config.internalApiKey, config.evApiKey || undefined);
@@ -545,10 +552,30 @@ if (botEnabled) {
   console.log(`Telegram bot started (@${config.telegramBotUsername})`);
 }
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   // eslint-disable-next-line no-console
   console.log(`API service listening on :${config.port}`);
 });
+
+function gracefulShutdown(signal: string) {
+  // eslint-disable-next-line no-console
+  console.log(`\n${signal} received, shutting down gracefully...`);
+  server.close(() => {
+    // eslint-disable-next-line no-console
+    console.log("HTTP server closed.");
+    store.flush();
+    process.exit(0);
+  });
+  // Force exit after 5s if connections don't close
+  setTimeout(() => {
+    // eslint-disable-next-line no-console
+    console.error("Forcing shutdown after timeout.");
+    process.exit(1);
+  }, 5000).unref();
+}
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
 
 class ApiError extends Error {
   constructor(

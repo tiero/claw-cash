@@ -9,7 +9,6 @@ import {
   toStablecoinToken,
   toEvmChain,
 } from "../utils/token.js";
-import { toSmallestUnit } from "@clw-cash/skills";
 import type { ParsedArgs } from "minimist";
 
 export async function handleSend(
@@ -116,7 +115,7 @@ export async function handleSend(
       const targetToken = toStablecoinToken(currency, where);
       body.targetToken = targetToken;
       body.targetChain = toEvmChain(where);
-      body.targetAmount = toSmallestUnit(amount, targetToken);
+      body.targetAmount = amount;
     }
     const result = await daemonPost("/send", body);
     return outputSuccess(result);
@@ -142,7 +141,7 @@ export async function handleSend(
     targetAddress: to,
     targetToken,
     targetChain,
-    targetAmount: toSmallestUnit(amount, targetToken),
+    targetAmount: amount,
   });
   return outputSuccess(result);
 }

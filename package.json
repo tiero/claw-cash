@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "description": "Claw Cash MVP for Evervault Enclaves",
   "scripts": {
-    "typecheck": "pnpm -r --filter ./api --filter ./enclave --filter ./sdk --filter ./skills --filter ./cli typecheck",
+    "typecheck": "pnpm -r --filter ./api --filter ./enclave --filter ./sdk --filter ./skills --filter ./cli --filter ./web typecheck",
+    "build:web": "pnpm --filter @clw-cash/web build",
+    "dev:web": "pnpm --filter @clw-cash/web dev",
     "start:api": "pnpm --filter ./api start",
     "start:enclave": "pnpm --filter ./enclave start",
     "test": "vitest run",

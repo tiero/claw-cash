@@ -4,3 +4,4 @@ packages:
   - "sdk"
   - "skills"
   - "cli"
+  - "web"

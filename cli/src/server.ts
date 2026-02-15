@@ -108,12 +108,13 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
         }
 
         // Stablecoin receive (swap stablecoin -> BTC)
+        const arkAddress = body.targetAddress as string || await ctx.bitcoin.getArkAddress();
         const result = await ctx.swap.swapStablecoinToBtc({
           sourceChain: body.sourceChain as EvmChain,
           sourceToken: body.sourceToken as StablecoinToken,
-          sourceAmount: amount,
-          targetAddress: body.targetAddress as string,
-          userAddress: body.userAddress as string,
+          sourceAmount: (amount as number) || 0,
+          targetAddress: arkAddress,
+          userAddress: (body.userAddress as string) || undefined,
         });
         return json(res, 200, result);
       }

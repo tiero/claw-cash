@@ -1,0 +1,107 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: #0a0a0a;
+  color: #e5e5e5;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#app {
+  width: 100%;
+  max-width: 420px;
+  padding: 16px;
+}
+
+.card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 16px;
+  padding: 40px 32px;
+  text-align: center;
+}
+
+h1 {
+  font-size: 14px;
+  font-weight: 500;
+  color: #888;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  margin-bottom: 32px;
+}
+
+.amount {
+  font-size: 36px;
+  font-weight: 700;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.chain {
+  font-size: 14px;
+  color: #666;
+  margin-bottom: 32px;
+}
+
+#connect-btn {
+  width: 100%;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #fff;
+  background: #f7931a;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+#connect-btn:hover {
+  background: #e8850f;
+}
+
+.step {
+  font-size: 15px;
+  color: #ccc;
+  margin-bottom: 12px;
+}
+
+.success {
+  color: #4ade80;
+  font-weight: 600;
+  font-size: 18px;
+}
+
+.error, .error-text {
+  color: #f87171;
+  font-size: 14px;
+  margin-top: 16px;
+}
+
+.raw-status {
+  font-size: 12px;
+  color: #555;
+  font-family: monospace;
+  margin-top: 8px;
+}
+
+.spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid #333;
+  border-top-color: #f7931a;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 12px auto 0;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}

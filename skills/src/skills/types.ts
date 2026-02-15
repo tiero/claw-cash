@@ -190,7 +190,7 @@ export interface StablecoinToBtcParams {
   sourceToken: StablecoinToken;
   sourceAmount: number;
   targetAddress: string;
-  userAddress: string;
+  userAddress?: string;
   referralCode?: string;
 }
 

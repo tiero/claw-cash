@@ -31,8 +31,8 @@ const STEPS: Record<string, StepInfo> = {
   connecting:     { title: "Connecting\u2026",          desc: "Approve in your wallet",             progress: 15 },
   "creating-swap":{ title: "Preparing swap\u2026",     desc: "Setting things up",                  progress: 30 },
   "preparing-tx": { title: "Building tx\u2026",        desc: "Almost there",                       progress: 40 },
-  approve:        { title: "Approve spend",            desc: "Check your wallet",                  progress: 50,
-    explainer: "Your wallet will ask to approve token spending. This is a standard permission \u2014 no funds leave yet." },
+  approve:        { title: "Step 1 of 2: Approve",     desc: "Check your wallet",                  progress: 50,
+    explainer: "Your wallet will ask to approve token spending. This is a standard permission \u2014 no funds leave yet. A second confirmation will follow." },
   fund:           { title: "Confirm payment",          desc: "Last step",                          progress: 70,
     explainer: "Your wallet will confirm the payment. This sends stablecoins to complete the swap to bitcoin." },
   waiting:        { title: "Processing\u2026",          desc: "Waiting for confirmation",           progress: 85 },
@@ -78,14 +78,18 @@ function brandHeader(): string {
     </div>`;
 }
 
-function footer(): string {
+function debugPanelHtml(): string {
   return `
-    <div class="footer">
-      <p class="footer-powered">powered by <span class="footer-arkade">${ARKADE_LOGO_SM} Arkade</span></p>
-    </div>
     <div class="debug-panel" id="debug-panel" hidden>
       <div class="debug-title">Diagnostics</div>
       <pre class="debug-content" id="debug-content"></pre>
+    </div>`;
+}
+
+function pageFooter(): string {
+  return `
+    <div class="page-footer">
+      <p class="footer-powered">powered by <a href="https://arkadeos.com" target="_blank" rel="noopener" class="footer-arkade">${ARKADE_LOGO_SM} Arkade</a></p>
     </div>`;
 }
 
@@ -168,8 +172,9 @@ export function renderPage(params: PaymentParams) {
       <div id="explainer-area"></div>
       <div id="error-area"></div>
 
-      ${footer()}
+      ${debugPanelHtml()}
     </div>
+    ${pageFooter()}
   `;
 
   // Copy handler
@@ -254,8 +259,8 @@ export function setStep(step: string) {
             <p class="status-desc">${info.desc}</p>
           </div>
           <button class="action-btn" disabled><span class="spinner"></span> ${info.title}</button>
-          ${footer()}
-        </div>`;
+        </div>
+        ${pageFooter()}`;
     }
     return;
   }
@@ -397,8 +402,8 @@ export function showError(msg: string) {
       <div class="checkout-card">
         ${brandHeader()}
         <div class="error-box"><p class="error-text">${msg}</p></div>
-        ${footer()}
-      </div>`;
+      </div>
+      ${pageFooter()}`;
   }
   updateDebug({ error: msg });
 }

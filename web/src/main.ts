@@ -1,6 +1,6 @@
-import { createPublicClient, http } from "viem";
+import { createPublicClient, http, erc20Abi, parseUnits } from "viem";
 import { mainnet } from "viem/chains";
-import { parseParams, CURRENCY_CHAIN_TO_TOKEN } from "./params.js";
+import { parseParams, CURRENCY_CHAIN_TO_TOKEN, TOKEN_DECIMALS } from "./params.js";
 import { connectWallet } from "./wallet.js";
 import { createSwap, getFundingCallData, pollSwapStatus } from "./swap.js";
 import { renderPage, setStep, setStatus, setEnsName, setSender, selectChain, showError, updateDebug } from "./ui.js";
@@ -99,16 +99,29 @@ async function main() {
           fundData = callData.createSwap.data;
         }
 
-        // 2. Approve token spend
-        setStep("approve");
-        const approveTxHash = await walletClient.sendTransaction({
-          to: approveTo as `0x${string}`,
-          data: approveData as `0x${string}`,
-          account: address,
-          chain: walletClient.chain,
+        // 2. Approve token spend (skip if allowance already sufficient)
+        const requiredAmount = parseUnits(String(params.amount), TOKEN_DECIMALS[selectedToken] ?? 6);
+        const currentAllowance = await publicClient.readContract({
+          address: approveTo as `0x${string}`,
+          abi: erc20Abi,
+          functionName: "allowance",
+          args: [address, fundTo as `0x${string}`],
         });
-        await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-        updateDebug({ approveTx: approveTxHash });
+        updateDebug({ currentAllowance: currentAllowance.toString(), requiredAmount: requiredAmount.toString() });
+
+        if (currentAllowance < requiredAmount) {
+          setStep("approve");
+          const approveTxHash = await walletClient.sendTransaction({
+            to: approveTo as `0x${string}`,
+            data: approveData as `0x${string}`,
+            account: address,
+            chain: walletClient.chain,
+          });
+          await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
+          updateDebug({ approveTx: approveTxHash });
+        } else {
+          updateDebug({ approveSkipped: true });
+        }
 
         // 3. Fund the swap
         setStep("fund");

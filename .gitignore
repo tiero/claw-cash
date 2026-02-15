@@ -6,6 +6,9 @@ node_modules
 dist
 enclave.eif
 
+# Wrangler
+.wrangler
+
 # Environment & secrets
 .env*
 *.pem

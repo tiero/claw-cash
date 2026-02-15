@@ -26,34 +26,11 @@ infra/        Enclave config and deployment
 
 ## CLI — `cash`
 
-The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. See [cli/SKILL.md](cli/SKILL.md) for the full agent tool description.
-
 ```bash
-# Setup (auto-authenticates, creates identity, starts daemon)
-cash init --api-url http://127.0.0.1:4000 --ark-server <url>
-
-# Re-authenticate (refresh expired session token)
-cash login
-
-# Send
-cash send --amount 100000 --currency btc --where arkade --to <address>
-cash send --amount 50000 --currency btc --where lightning --to <bolt11>
-cash send lnbc500n1...                          # auto-detect invoice
-cash send --amount 10 --currency usdt --where polygon --to <0x-address>
-
-# Receive
-cash receive --amount 100000 --currency btc --where lightning
-cash receive --amount 100000 --currency btc --where arkade
-
-# Balance
-cash balance
-
-# Daemon (swap monitoring — auto-started by init)
-cash start                                       # start if not running
-cash status                                      # check daemon & pending swaps
-cash swaps                                       # list all pending swaps
-cash stop                                        # stop daemon
+npm i -g claw-cash
 ```
+
+The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. Full command reference and agent tips: [cli/SKILL.md](cli/SKILL.md).
 
 ## Quickstart
 

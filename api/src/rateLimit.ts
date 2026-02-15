@@ -1,15 +1,16 @@
-export class SlidingWindowRateLimiter {
-  private readonly entries = new Map<string, number[]>();
+export class KVRateLimiter {
+  constructor(private readonly kv: KVNamespace) {}
 
-  allow(key: string, limit: number, windowMs: number): boolean {
-    const now = Date.now();
-    const kept = (this.entries.get(key) ?? []).filter((timestamp) => now - timestamp < windowMs);
-    if (kept.length >= limit) {
-      this.entries.set(key, kept);
-      return false;
-    }
-    kept.push(now);
-    this.entries.set(key, kept);
+  async allow(key: string, limit: number, windowMs: number): Promise<boolean> {
+    const windowKey = `rl:${key}:${Math.floor(Date.now() / windowMs)}`;
+    const current = await this.kv.get(windowKey);
+    const count = current ? parseInt(current, 10) : 0;
+
+    if (count >= limit) return false;
+
+    await this.kv.put(windowKey, String(count + 1), {
+      expirationTtl: Math.ceil(windowMs / 1000) + 60,
+    });
     return true;
   }
 }

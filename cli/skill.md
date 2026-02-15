@@ -8,8 +8,7 @@ All commands output JSON to stdout. Exit code 0 = success, 1 = error.
 
 ```bash
 # First time — authenticates, creates identity, saves config, starts daemon
-cash init --api-url https://api.clw.cash --ark-server https://ark.clw.cash
-
+cash init
 # Re-authenticate when session expires
 cash login
 ```
@@ -86,7 +85,31 @@ cash receive --amount 10 --currency usdt --where polygon --address <0x-sender-ad
 
 ```bash
 cash balance
-# -> {"ok": true, "data": {"total": 250000, "offchain": {...}, "onchain": {...}}}
+# -> {"ok": true, "data": {"total": 250000, "offchain": {"settled": 50000, "preconfirmed": 20000, "available": 70000}, "onchain": {"confirmed": 30000, "total": 30000}}}
+```
+
+### Swap Management
+
+```bash
+# Check a single swap by ID
+cash swap <swap-id>
+# -> {"ok": true, "data": {"id": "...", "status": "funded", "direction": "btc_to_stablecoin", "local": {...}, "remote": {...}}}
+
+# List swaps (grouped by status, last 5 per category)
+cash swaps
+# -> {"ok": true, "data": {"lendaswap": {"pending": [...], "claimed": [...], "refunded": [...], "expired": [...], "failed": [...]}}}
+
+# Filter by status
+cash swaps --pending
+cash swaps --claimed --limit 10
+
+# Manually claim a completed swap
+cash claim <swap-id>
+# -> {"ok": true, "data": {"success": true, "txHash": "0x...", "chain": "polygon"}}
+
+# Refund an expired swap
+cash refund <swap-id>
+# -> {"ok": true, "data": {"success": true, "txId": "...", "refundAmount": 95000}}
 ```
 
 ### Daemon (Swap Monitoring)
@@ -98,13 +121,12 @@ The daemon runs in the background to automatically claim Lightning HTLCs and mon
 cash start
 # -> {"ok": true, "data": {"started": true, "pid": 12345, "port": 3457}}
 
-# Check daemon status
+# Check daemon and session status
 cash status
-# -> {"ok": true, "data": {"running": true, "pid": 12345, "port": 3457, "lightning": {"pending": 0}, "lendaswap": {"pending": 1, "lastPoll": "..."}}}
+# -> {"ok": true, "data": {"session": "active", "sessionExpiresAt": 1739..., "daemon": {"running": true, "pid": 12345, "port": 3457}}}
 
 # List pending swaps
-cash swaps
-# -> {"ok": true, "data": {"lightning": [...], "lendaswap": [...]}}
+cash swaps --pending
 
 # Stop the daemon
 cash stop
@@ -132,3 +154,66 @@ Error:
 | btc      | onchain, lightning, arkade  |
 | usdt     | polygon, ethereum, arbitrum |
 | usdc     | polygon, ethereum, arbitrum |
+
+## Swap Status Lifecycle
+
+| Status             | Meaning                        |
+| ------------------ | ------------------------------ |
+| pending            | Swap created, awaiting funding |
+| awaiting_funding   | Initial state                  |
+| funded             | User has sent funds            |
+| processing         | Swap in progress               |
+| completed          | Swap done, claimed             |
+| expired            | Timelock expired               |
+| refunded           | Funds returned                 |
+| failed             | Swap failed                    |
+
+Directions: `btc_to_stablecoin` or `stablecoin_to_btc`.
+
+Token identifiers: `btc_arkade`, `usdc_pol`, `usdc_eth`, `usdc_arb`, `usdt0_pol`, `usdt_eth`, `usdt_arb`.
+
+## Agent Tips
+
+All output is JSON — pipe through `jq` to extract specific fields:
+
+```bash
+# Get just the swap status
+cash swap <swap-id> | jq .data.status
+
+# Get total balance in sats
+cash balance | jq .data.total
+
+# Get offchain available balance
+cash balance | jq .data.offchain.available
+
+# Check if daemon is running
+cash status | jq .data.daemon.running
+
+# Check session state (active or expired)
+cash status | jq .data.session
+
+# List only pending swap IDs
+cash swaps --pending | jq '[.data.lendaswap.pending[].id]'
+
+# Get the payment bolt11 invoice
+cash receive --amount 50000 --currency btc --where lightning | jq -r .data.bolt11
+
+# Get the ark address for receiving
+cash receive --amount 100000 --currency btc --where arkade | jq -r .data.address
+
+# Check if a command succeeded
+cash send ... && echo "sent" || echo "failed"
+```
+
+Common workflow for monitoring a stablecoin swap:
+
+```bash
+# 1. Initiate the swap
+cash send --amount 10 --currency usdc --where polygon --to 0x...
+
+# 2. Poll status until completed (daemon does this automatically)
+cash swap <swap-id> | jq .data.status
+
+# 3. If expired, refund
+cash refund <swap-id>
+```

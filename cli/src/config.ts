@@ -29,7 +29,7 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
       overrides?.apiBaseUrl ??
       process.env.CLW_API_URL ??
       fileConfig.apiBaseUrl ??
-      "",
+      "https://api.clw.cash",
     sessionToken:
       overrides?.sessionToken ??
       process.env.CLW_SESSION_TOKEN ??
@@ -49,7 +49,7 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
       overrides?.arkServerUrl ??
       process.env.CLW_ARK_SERVER_URL ??
       fileConfig.arkServerUrl ??
-      "",
+      "https://arkade.computer",
     network:
       overrides?.network ??
       process.env.CLW_NETWORK ??

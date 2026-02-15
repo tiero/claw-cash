@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { etc, getPublicKey, hashes, sign } from "@noble/secp256k1";
+import { etc, getPublicKey, hashes, schnorr } from "@noble/secp256k1";
 
 // @noble/secp256k1 v3 requires hash functions to be configured for signing
 hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
@@ -153,7 +153,7 @@ const generateKey = (): { privateKeyHex: string; publicKeyHex: string } => {
 };
 
 const signDigest = (privateKeyHex: string, digestHex: string): string => {
-  const sig = sign(etc.hexToBytes(digestHex), etc.hexToBytes(privateKeyHex), { prehash: false, lowS: true });
+  const sig = schnorr.sign(etc.hexToBytes(digestHex), etc.hexToBytes(privateKeyHex));
   return etc.bytesToHex(sig);
 };
 

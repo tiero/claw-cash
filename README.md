@@ -26,11 +26,14 @@ infra/        Enclave config and deployment
 
 ## CLI — `cash`
 
-The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. See [cli/skill.md](cli/skill.md) for the full agent tool description.
+The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. See [cli/SKILL.md](cli/SKILL.md) for the full agent tool description.
 
 ```bash
-# Setup (creates identity, saves config, starts background daemon)
-cash init --api-url http://127.0.0.1:4000 --token <jwt> --ark-server <url>
+# Setup (auto-authenticates, creates identity, starts daemon)
+cash init --api-url http://127.0.0.1:4000 --ark-server <url>
+
+# Re-authenticate (refresh expired session token)
+cash login
 
 # Send
 cash send --amount 100000 --currency btc --where arkade --to <address>
@@ -70,33 +73,22 @@ pnpm start:api
 
 No enclave redeploy needed for local development. The enclave service runs as a regular Node process locally — it only runs inside Evervault in production.
 
-### 2. Get a session token
+### 2. Initialize the CLI
 
 ```bash
-# Create auth challenge (auto-resolves in test mode when no TELEGRAM_BOT_TOKEN is set)
-curl -s -X POST http://127.0.0.1:4000/v1/auth/challenge \
-  -H 'Content-Type: application/json' \
-  -d '{"telegram_user_id": "test_user"}' | jq
-
-# Verify and get session token
-curl -s -X POST http://127.0.0.1:4000/v1/auth/verify \
-  -H 'Content-Type: application/json' \
-  -d '{"challenge_id": "<challenge_id_from_above>"}' | jq .token
-```
-
-### 3. Initialize the CLI
-
-```bash
-# Uses the session token to create an identity and save config
+# Auto-authenticates, creates an identity, saves config, starts daemon
 pnpm --filter ./cli dev -- init \
   --api-url http://127.0.0.1:4000 \
-  --token <session_token> \
   --ark-server https://server.arkade.fun
 ```
 
+In test mode (no `TELEGRAM_BOT_TOKEN` set), authentication resolves automatically. In production, a Telegram deep link is shown for 2FA confirmation.
+
 This creates `~/.clw-cash/config.json` with your identity credentials and starts a background daemon for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
 
-### 4. Use the CLI
+You can also pass a token explicitly: `--token <jwt>`.
+
+### 3. Use the CLI
 
 ```bash
 # Check balance (requires Ark server to be reachable)
@@ -142,12 +134,88 @@ pnpm typecheck
 | GET | `/health` | No | Health check |
 | POST | `/v1/auth/challenge` | No | Create auth challenge |
 | POST | `/v1/auth/verify` | No | Verify challenge, get JWT |
+| POST | `/v1/auth/bot-session` | Bot key | Get session for a Telegram user (bot-to-bot) |
 | POST | `/v1/identities` | Yes | Create identity (key generated in enclave) |
+| POST | `/v1/identities/:id/restore` | Yes | Restore identity from backup |
 | POST | `/v1/identities/:id/sign-intent` | Yes | Get signing ticket |
 | POST | `/v1/identities/:id/sign` | Yes | Sign with ticket |
 | POST | `/v1/identities/:id/sign-batch` | Yes | Batch sign multiple digests |
 | DELETE | `/v1/identities/:id` | Yes | Destroy identity |
 | GET | `/v1/audit` | Yes | Audit trail |
+
+## Bot Integration (Factory Bot)
+
+clw.cash acts as a **factory bot** — a backend service that other Telegram bots use to give their users Bitcoin wallets. Your bot authenticates with a shared API key and gets per-user sessions without any user-facing auth flow.
+
+### How it works
+
+```text
+User (Telegram)           Your Bot                    clw.cash API          Enclave
+     │                       │                            │                    │
+     │  "send 1000 sats"     │                            │                    │
+     │  from.id = 98765      │                            │                    │
+     │──────────────────────►│                            │                    │
+     │                       │  POST /v1/auth/bot-session │                    │
+     │                       │  x-bot-api-key: <secret>   │                    │
+     │                       │  { telegram_user_id: 98765 }                    │
+     │                       │───────────────────────────►│                    │
+     │                       │  ◄── { token, user }       │                    │
+     │                       │                            │                    │
+     │                       │  SDK: wallet.sendBitcoin() │  sign digest       │
+     │                       │───────────────────────────►│───────────────────►│
+     │                       │  ◄── { txid }              │  ◄── { signature } │
+     │  ◄── "Sent!"          │                            │                    │
+```
+
+**Telegram guarantees `from.id` can't be faked** — only your bot (with the API key) can create sessions, and it only does so for verified Telegram users. No impersonation is possible.
+
+### Configuration
+
+1. **Create a Telegram bot** via [@BotFather](https://t.me/BotFather) — this is the "factory" auth bot
+1. **Generate a bot API key** — any random secret string
+1. **Set env vars** on the clw.cash API server:
+
+```bash
+TELEGRAM_BOT_TOKEN=<token from BotFather>
+TELEGRAM_BOT_USERNAME=<your_bot_username>
+BOT_API_KEY=<your random secret>
+```
+
+1. **In your bot code**, use the SDK directly (not the CLI):
+
+```typescript
+import { createClwBitcoinSkill } from "@clw-cash/skills";
+
+// Get a session for this Telegram user
+const session = await fetch("https://api.clw.cash/v1/auth/bot-session", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    "x-bot-api-key": process.env.BOT_API_KEY,
+  },
+  body: JSON.stringify({ telegram_user_id: String(msg.from.id) }),
+}).then(r => r.json());
+
+// Create a wallet skill for this user
+const bitcoin = await createClwBitcoinSkill({
+  apiBaseUrl: "https://api.clw.cash",
+  sessionToken: session.token,
+  identityId: user.identityId,
+  publicKey: user.publicKey,
+  arkServerUrl: "https://server.arkade.fun",
+});
+
+// Use it
+const result = await bitcoin.send({ address: "ark1q...", amount: 1000 });
+```
+
+### Auth modes
+
+| Mode | How it works | Use case |
+| ---- | ------------ | -------- |
+| **CLI** (`cash init`) | Challenge → Telegram deep link → human confirms | Developer testing, standalone agent |
+| **Bot session** | Bot API key + `telegram_user_id` → instant JWT | Telegram bot serving many users |
+| **Test mode** | No `TELEGRAM_BOT_TOKEN` → auto-resolves | Local dev, CI |
 
 ## Deploy to Evervault
 

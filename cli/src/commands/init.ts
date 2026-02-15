@@ -1,8 +1,72 @@
 import { ClwApiClient } from "@clw-cash/sdk";
 import { loadConfig, saveConfig, type CashConfig } from "../config.js";
-import { outputSuccess, outputError } from "../output.js";
+import { outputSuccess } from "../output.js";
 import { getPort, startDaemonInBackground } from "../daemon.js";
 import type { ParsedArgs } from "minimist";
+
+async function authenticate(config: CashConfig): Promise<string> {
+  // Request a challenge (auto-resolves in test mode with telegram_user_id)
+  const challengeRes = await fetch(`${config.apiBaseUrl}/v1/auth/challenge`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ telegram_user_id: "test_user" }),
+  });
+  if (!challengeRes.ok) {
+    throw new Error(`Challenge failed: ${await challengeRes.text()}`);
+  }
+
+  const challenge = (await challengeRes.json()) as {
+    challenge_id: string;
+    deep_link: string | null;
+  };
+
+  if (challenge.deep_link) {
+    console.error(`Open this link to authenticate:\n\n  ${challenge.deep_link}\n`);
+    console.error("Waiting for confirmation...");
+  }
+
+  // Poll verify until resolved (120s timeout)
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    const verifyRes = await fetch(`${config.apiBaseUrl}/v1/auth/verify`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ challenge_id: challenge.challenge_id }),
+    });
+
+    if (verifyRes.ok) {
+      const session = (await verifyRes.json()) as {
+        token: string;
+        expires_in: number;
+      };
+      return session.token;
+    }
+
+    if (verifyRes.status === 202) {
+      await new Promise((r) => setTimeout(r, 2000));
+      continue;
+    }
+
+    throw new Error(`Verify failed: ${await verifyRes.text()}`);
+  }
+
+  throw new Error("Login timed out");
+}
+
+async function restoreIdentity(config: CashConfig): Promise<void> {
+  const res = await fetch(`${config.apiBaseUrl}/v1/identities/${config.identityId}/restore`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      authorization: `Bearer ${config.sessionToken}`,
+    },
+    body: JSON.stringify({ public_key: config.publicKey }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Failed to restore identity: ${text}`);
+  }
+}
 
 export async function handleInit(args: ParsedArgs): Promise<never> {
   const config = loadConfig({
@@ -12,24 +76,22 @@ export async function handleInit(args: ParsedArgs): Promise<never> {
     network: args.network as string | undefined,
   });
 
-  if (!config.apiBaseUrl) {
-    return outputError("Missing --api-url <url>");
-  }
+  // Auto-login if no token provided
   if (!config.sessionToken) {
-    return outputError("Missing --token <jwt>");
-  }
-  if (!config.arkServerUrl) {
-    return outputError("Missing --ark-server <url>");
+    config.sessionToken = await authenticate(config);
   }
 
-  // Create a new identity if none specified
   if (!config.identityId || !config.publicKey) {
+    // No identity yet — create a new one
     const identity = await ClwApiClient.createIdentity(
       config.apiBaseUrl,
       config.sessionToken
     );
     config.identityId = identity.id;
     config.publicKey = identity.public_key;
+  } else {
+    // Identity exists in config — ensure it's registered on the API (survives server restarts)
+    await restoreIdentity(config);
   }
 
   saveConfig(config);

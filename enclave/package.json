@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clw-cash/shared": "workspace:*",
     "@noble/secp256k1": "3.0.0",
     "express": "5.2.1",
     "jose": "^6.1.3",

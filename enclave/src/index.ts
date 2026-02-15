@@ -15,6 +15,7 @@ hashes.sha256 = (...msgs: Uint8Array[]): Uint8Array => {
 };
 import { errors, jwtVerify } from "jose";
 import { z } from "zod";
+import { gracefulShutdown } from "@clw-cash/shared";
 import { config } from "./config.js";
 
 const ticketSecret = new TextEncoder().encode(config.ticketSigningSecret);
@@ -279,10 +280,12 @@ app.use((error: unknown, _req: Request, res: Response, _next: NextFunction) => {
   res.status(500).json({ error: message });
 });
 
-app.listen(config.port, () => {
+const server = app.listen(config.port, () => {
   // eslint-disable-next-line no-console
   console.log(`Enclave service listening on :${config.port}`);
 });
+
+gracefulShutdown(server, () => keysByIdentityId.clear());
 
 class ApiError extends Error {
   constructor(

@@ -9,6 +9,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@clw-cash/shared": "workspace:*",
     "express": "^4.21.2",
     "jsonwebtoken": "^9.0.2",
     "uuid": "^11.1.0",

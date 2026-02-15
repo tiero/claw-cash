@@ -4,6 +4,7 @@
   "description": "Bitcoin & Stablecoin agent wallet CLI. Keys held in a secure enclave.",
   "type": "module",
   "bin": {
+    "clw-cash": "./dist/index.js",
     "cash": "./dist/index.js"
   },
   "files": [

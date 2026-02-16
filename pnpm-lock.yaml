@@ -57,7 +57,7 @@ importers:
     devDependencies:
       '@clw-cash/sdk':
         specifier: workspace:*
-        version: link:../sdk
+        version: link:../remote-signer-identity
       '@clw-cash/skills':
         specifier: workspace:*
         version: link:../skills
@@ -105,7 +105,7 @@ importers:
         specifier: ^5.7.3
         version: 5.9.3
 
-  sdk:
+  remote-signer-identity:
     dependencies:
       '@arkade-os/sdk':
         specifier: ^0.3.12
@@ -131,7 +131,7 @@ importers:
         version: 0.3.13
       '@clw-cash/sdk':
         specifier: workspace:*
-        version: link:../sdk
+        version: link:../remote-signer-identity
       '@lendasat/lendaswap-sdk-pure':
         specifier: ^0.0.2
         version: 0.0.2

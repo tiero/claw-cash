@@ -1,7 +1,7 @@
 packages:
   - "api"
   - "enclave"
-  - "sdk"
+  - "remote-signer-identity"
   - "skills"
   - "cli"
   - "web"

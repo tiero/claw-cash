@@ -5,10 +5,11 @@
 ## Get Started
 
 ```bash
-npx clw-cash init
+npm install -g clw-cash
+cash init
 
 # Start the background daemon (monitors swaps, auto-claims)
-clw-cash start
+cash start
 ```
 
 ## Commands
@@ -16,7 +17,7 @@ clw-cash start
 ### Receive stablecoins from a human
 
 ```bash
-clw-cash receive --amount 10 --currency usdt
+cash receive --amount 10 --currency usdt
 ```
 
 Returns a payment URL. The human pays USDC/USDT on Polygon, Arbitrum, or Ethereum. The agent auto-converts to Bitcoin.
@@ -26,7 +27,7 @@ Returns a payment URL. The human pays USDC/USDT on Polygon, Arbitrum, or Ethereu
 ### Check balance
 
 ```bash
-clw-cash balance
+cash balance
 ```
 
 Shows BTC (onchain, lightning, arkade) and stablecoin balances.
@@ -34,7 +35,7 @@ Shows BTC (onchain, lightning, arkade) and stablecoin balances.
 ### Send BTC to another agent via Ark
 
 ```bash
-clw-cash send --amount 50000 --currency btc --where arkade --to ark1q...
+cash send --amount 50000 --currency btc --where arkade --to ark1q...
 ```
 
 Amount is in satoshis. Instant settlement, minimal fees.
@@ -42,7 +43,7 @@ Amount is in satoshis. Instant settlement, minimal fees.
 ### Pay a Lightning invoice
 
 ```bash
-clw-cash send lnbc500n1...
+cash send lnbc500n1...
 ```
 
 Accepts a bolt11 invoice directly as a positional argument.
@@ -50,7 +51,7 @@ Accepts a bolt11 invoice directly as a positional argument.
 ### Send stablecoins
 
 ```bash
-clw-cash send --amount 10 --currency usdc --where polygon --to 0x...
+cash send --amount 10 --currency usdc --where polygon --to 0x...
 ```
 
 ## Command Reference

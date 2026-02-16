@@ -11,10 +11,13 @@ Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = 
 - **Ask before sending.** Always confirm with the user before running `cash send`. Balance checks and receives are safe.
 - **One command at a time.** Don't chain or batch. Run, read output, decide next step.
 - **Timeouts:** 30s default, 120s for `cash init`.
+- **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
 
 ## Setup
 
 ```bash
+# Install globally
+npm install -g clw-cash
 # First time — authenticates, creates identity, saves config, starts daemon
 cash init
 # Re-authenticate when session expires (blocking — waits up to 120s)
@@ -23,7 +26,7 @@ cash login
 
 `init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). If an identity already exists on the server (e.g., from a previous install or sandbox reset), it **auto-recovers** it instead of creating a new one. Config is saved to `~/.clw-cash/config.json`, and it **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
 
-If the session token expires, run `cash login` to re-authenticate. If the daemon stops, restart it with `cash start`.
+If the session token expires, run `cash login` to re-authenticate. The daemon can be stopped with `cash stop` and restarted with `cash start`.
 
 ### Non-blocking Auth (for Telegram bots)
 

@@ -873,6 +873,11 @@ h2 {
   display: inline-block;
 }
 
+.roadmap-tag.shipped {
+  background: #2a1a1a;
+  color: var(--orange);
+}
+
 .roadmap-tag.now {
   background: #1a2a1a;
   color: #4ade80;

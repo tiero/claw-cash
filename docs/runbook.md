@@ -197,15 +197,6 @@ npx wrangler rollback --env production
 # Rollback Pages: Dashboard > Pages > clw-cash-web > Deployments > Rollback
 ```
 
-## Data Migration from Express API
-
-If migrating from the old in-memory Express API:
-
-```bash
-# Export key backups from old api-data/key-backups.json and import to D1
-npx wrangler d1 execute clw-cash-db --env production --remote --file=migration.sql
-```
-
 ## TODO Before Production
 
 - [x] Replace plaintext sealed_key backup with encrypted backup (done — uses Evervault encryption / AES-256-GCM fallback)

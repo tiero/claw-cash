@@ -1,9 +1,0 @@
-{
-  "f39fcda5-fe6e-4d7f-a465-da76a948ce5f": {
-    "identity_id": "f39fcda5-fe6e-4d7f-a465-da76a948ce5f",
-    "alg": "secp256k1",
-    "sealed_key": "14cc301b3c264e571f0108d0:f4ff59ca16c0ebbb1517c44d5868964760202b0c7e9bee3b7171162a6a11b07da024e97e15c06aff7503758f07537ba211135961d43d00dc99603423302518c5:78e0489d7c6c5b88f60c912fa8f8feab",
-    "created_at": "2026-02-14T22:34:02.967Z",
-    "updated_at": "2026-02-14T22:34:02.967Z"
-  }
-}

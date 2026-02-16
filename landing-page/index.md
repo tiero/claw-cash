@@ -61,6 +61,7 @@ cash send --amount 10 --currency usdc --where polygon --to 0x...
 | `status`  | Show daemon status                   |
 | `send`    | Send BTC or stablecoins              |
 | `receive` | Receive BTC or stablecoins           |
+| `fetch`   | Pay x402-protected APIs with BTC     |
 | `balance` | Check balance                        |
 | `swap`    | Check a specific swap status         |
 | `swaps`   | List all swaps                       |
@@ -110,7 +111,7 @@ Agents accumulate and hold Bitcoin. When they need to pay for something — an x
 
 ### Pay for APIs (x402)
 
-Agent hits a paywall, gets a 402. Claw Cash swaps BTC to stablecoins on the fly and pays. Hold sats, spend dollars — automatically.
+`cash fetch <url>` — agent hits a paywall, gets a 402. Claw Cash parses the payment requirements, swaps BTC to USDC on the required chain (Polygon, Arbitrum, Ethereum), signs the payment authorization via ECDSA, and retries. Hold sats, spend dollars — automatically.
 
 ### Pay Other Agents
 
@@ -131,13 +132,17 @@ More at [clw.cash/why](https://clw.cash/why)
 
 ## Roadmap
 
+### SHIPPED
+
+- **x402 Payments** — `cash fetch <url>` — detect `402 Payment Required`, auto-swap BTC to USDC, sign via ECDSA, retry with proof. Supports Polygon, Arbitrum, Ethereum via Thirdweb facilitators.
+
 ### NOW
 
 - **MCP Server** — Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.
 
 ### NEXT
 
-- **x402 Client Support** — `cash pay <url>` command. Detect `402 Payment Required`, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5)).
+- **Bitcoin x402 Facilitator** — Pay x402 APIs directly with sats — Lightning, Arkade, or on-chain. No stablecoin swap needed. BIP-322 signed proofs, native Bitcoin settlement.
 - **Spending Policies** — Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.
 - **More Auth Providers** — Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.
 
@@ -154,7 +159,7 @@ More at [clw.cash/roadmap](https://clw.cash/roadmap)
 Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
 
 **How does x402 payment work?**
-When an agent hits an API that returns `402 Payment Required`, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in [#5](https://github.com/tiero/clw.cash/issues/5).
+`cash fetch <url>` makes a request. If the server returns `402 Payment Required`, Claw Cash parses the payment requirements (amount, token, chain), swaps BTC to USDC on the required chain via LendaSwap, signs the x402 payment authorization via ECDSA through the enclave, and retries the request with proof. Supports Polygon, Arbitrum, and Ethereum. Bitcoin-native x402 payments (Lightning, Arkade) are on the roadmap.
 
 **Where are the private keys stored?**
 Inside an Evervault Enclave. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel. Even if the host machine is compromised, the keys remain inaccessible.

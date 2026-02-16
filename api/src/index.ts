@@ -272,10 +272,11 @@ app.post("/v1/identities/:id/sign-intent", requireAuth, async (c) => {
   const digestHash = await CloudflareStore.digestHash(digest);
   const nonce = crypto.randomUUID();
   const ticketId = crypto.randomUUID();
+  const signatureType = body.signature_type;
 
   const ticketTtl = parseInt(c.env.TICKET_TTL_SECONDS, 10);
   const ticket = await signTicketToken(
-    { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
+    { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce, signature_type: signatureType },
     c.env.TICKET_SIGNING_SECRET,
     ticketTtl,
   );
@@ -283,7 +284,7 @@ app.post("/v1/identities/:id/sign-intent", requireAuth, async (c) => {
   const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
   await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
 
-  return c.json({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, nonce, scope: "sign", expires_at: expiresAt, ticket }, 201);
+  return c.json({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, nonce, scope: "sign", signature_type: signatureType, expires_at: expiresAt, ticket }, 201);
 });
 
 app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
@@ -300,6 +301,7 @@ app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
   const body = signSchema.parse(await c.req.json());
   const digest = normalizeDigestHex(body.digest);
   const digestHash = await CloudflareStore.digestHash(digest);
+  const signatureType = body.signature_type;
 
   const claims = await verifyTicketToken(body.ticket, c.env.TICKET_SIGNING_SECRET);
   if (claims.sub !== user.id) throw new HTTPException(403, { message: "Ticket user mismatch" });
@@ -312,21 +314,21 @@ app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
   if (ticket.used_at) throw new HTTPException(409, { message: "Ticket already used" });
   if (new Date(ticket.expires_at).getTime() <= Date.now()) throw new HTTPException(410, { message: "Ticket expired" });
 
-  let signature: string;
+  let signResult: { signature: string; r?: string; s?: string; v?: number };
   try {
-    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
+    signResult = await enclave.sign(identity.id, digest, body.ticket, signatureType);
   } catch (error) {
     if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
     if (!(await restoreBackup(store, enclave, identity.id))) {
       throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
     }
-    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
+    signResult = await enclave.sign(identity.id, digest, body.ticket, signatureType);
   }
 
   await store.markTicketUsed(ticket.id);
-  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { digest_hash: digestHash } });
+  await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { digest_hash: digestHash, signature_type: signatureType } });
 
-  return c.json({ signature });
+  return c.json(signResult);
 });
 
 app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
@@ -342,16 +344,17 @@ app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
 
   const body = signBatchSchema.parse(await c.req.json());
   const ticketTtl = parseInt(c.env.TICKET_TTL_SECONDS, 10);
-  const signatures: string[] = [];
+  const signatures: Array<{ signature: string; r?: string; s?: string; v?: number }> = [];
 
   for (const item of body.digests) {
     const digest = normalizeDigestHex(item.digest);
     const digestHash = await CloudflareStore.digestHash(digest);
     const nonce = crypto.randomUUID();
     const ticketId = crypto.randomUUID();
+    const signatureType = item.signature_type;
 
     const ticket = await signTicketToken(
-      { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
+      { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce, signature_type: signatureType },
       c.env.TICKET_SIGNING_SECRET,
       ticketTtl,
     );
@@ -359,19 +362,19 @@ app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
     const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
     await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
 
-    let signature: string;
+    let signResult: { signature: string; r?: string; s?: string; v?: number };
     try {
-      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
+      signResult = await enclave.sign(identity.id, digest, ticket, signatureType);
     } catch (error) {
       if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
       if (!(await restoreBackup(store, enclave, identity.id))) {
         throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
       }
-      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
+      signResult = await enclave.sign(identity.id, digest, ticket, signatureType);
     }
 
     await store.markTicketUsed(ticketId);
-    signatures.push(signature);
+    signatures.push(signResult);
   }
 
   await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { batch_size: body.digests.length } });

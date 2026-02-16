@@ -7,7 +7,9 @@ export type {
   InputDigest,
   SignIntentResponse,
   SignResponse,
+  EcdsaSignResponse,
   SignBatchResponse,
   CreateIdentityResponse,
 } from "./types.js";
 export { hexDecode, hexEncode } from "./hex.js";
+export { compressedPubKeyToEvmAddress } from "./evm.js";

@@ -21,10 +21,20 @@ export interface SignIntentResponse {
 
 export interface SignResponse {
   signature: string;
+  r?: string;
+  s?: string;
+  v?: number;
+}
+
+export interface EcdsaSignResponse {
+  signature: string;
+  r: string;
+  s: string;
+  v: number;
 }
 
 export interface SignBatchResponse {
-  signatures: string[];
+  signatures: Array<{ signature: string; r?: string; s?: string; v?: number }>;
 }
 
 export interface CreateIdentityResponse {

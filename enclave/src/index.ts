@@ -1,6 +1,6 @@
 import { createCipheriv, createDecipheriv, createHash, createHmac, randomBytes } from "node:crypto";
 import express, { type NextFunction, type Request, type Response } from "express";
-import { etc, getPublicKey, hashes, schnorr } from "@noble/secp256k1";
+import { etc, getPublicKey, hashes, schnorr, sign as ecdsaSign, Signature } from "@noble/secp256k1";
 
 // @noble/secp256k1 v3 requires hash functions to be configured for signing
 hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
@@ -104,7 +104,8 @@ const generateSchema = z.object({
 const signSchema = z.object({
   identity_id: z.string().uuid(),
   digest: z.string().regex(/^([a-fA-F0-9]{64}|0x[a-fA-F0-9]{64})$/),
-  ticket: z.string().min(32).max(4096)
+  ticket: z.string().min(32).max(4096),
+  signature_type: z.enum(["schnorr", "ecdsa"]).default("schnorr")
 });
 
 const destroySchema = z.object({
@@ -153,9 +154,20 @@ const generateKey = (): { privateKeyHex: string; publicKeyHex: string } => {
   return { privateKeyHex, publicKeyHex };
 };
 
-const signDigest = (privateKeyHex: string, digestHex: string): string => {
+const signDigestSchnorr = (privateKeyHex: string, digestHex: string): string => {
   const sig = schnorr.sign(etc.hexToBytes(digestHex), etc.hexToBytes(privateKeyHex));
   return etc.bytesToHex(sig);
+};
+
+const signDigestEcdsa = (privateKeyHex: string, digestHex: string): { signature: string; r: string; s: string; v: number } => {
+  const recovered = ecdsaSign(etc.hexToBytes(digestHex), etc.hexToBytes(privateKeyHex), { prehash: false, format: "recovered" });
+  const parsed = Signature.fromBytes(recovered, "recovered");
+  return {
+    signature: etc.bytesToHex(recovered),
+    r: parsed.r.toString(16).padStart(64, "0"),
+    s: parsed.s.toString(16).padStart(64, "0"),
+    v: parsed.recovery! + 27,
+  };
 };
 
 app.use(enforceInternalAuth);
@@ -209,8 +221,13 @@ app.post("/internal/sign", async (req, res, next) => {
       throw new ApiError(409, "Replay detected for ticket nonce");
     }
     nonceReplayCache.set(claims.nonce, claims.exp);
-    const signature = signDigest(keyRecord.private_key, digestHex);
-    res.json({ signature });
+    if (body.signature_type === "ecdsa") {
+      const result = signDigestEcdsa(keyRecord.private_key, digestHex);
+      res.json(result);
+    } else {
+      const signature = signDigestSchnorr(keyRecord.private_key, digestHex);
+      res.json({ signature });
+    }
   } catch (error) {
     next(error);
   }

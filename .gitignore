@@ -12,6 +12,7 @@ enclave.eif
 # Environment & secrets
 .env*
 *.pem
+api/api-data/
 
 # Logs
 *.log

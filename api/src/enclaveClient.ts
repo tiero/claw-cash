@@ -6,6 +6,9 @@ interface GenerateResponse {
 
 interface SignResponse {
   signature: string;
+  r?: string;
+  s?: string;
+  v?: number;
 }
 
 interface DestroyResponse {
@@ -33,11 +36,12 @@ export class EnclaveClient {
     });
   }
 
-  async sign(identityId: string, digest: string, ticket: string): Promise<SignResponse> {
+  async sign(identityId: string, digest: string, ticket: string, signatureType: "schnorr" | "ecdsa" = "schnorr"): Promise<SignResponse> {
     return this.request<SignResponse>("/internal/sign", {
       identity_id: identityId,
       digest,
-      ticket
+      ticket,
+      signature_type: signatureType
     });
   }
 

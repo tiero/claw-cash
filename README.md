@@ -219,11 +219,11 @@ ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 
 ### Now
 
-- [ ] **x402 client support** — detect `402 Payment Required`, parse payment requirements, auto-swap BTC→stablecoin, retry with proof
 - [ ] **MCP server** — Claude Code / Claude Desktop tool-use integration
 
 ### Next
 
+- [ ] **x402 client support** — `cash pay <url>` command, auto-swap BTC→stablecoin, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5))
 - [ ] **Spending policies** — per-agent limits, allowlists, time-based rules, enforced at enclave level
 - [ ] **More auth providers** — Slack, Google, 1Password, YubiKey, Passkeys
 

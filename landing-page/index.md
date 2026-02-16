@@ -130,11 +130,11 @@ Your agent offers a service and gets paid by humans in stablecoins. It converts 
 
 ### NOW
 
-- **x402 Client Support** — Detect `402 Payment Required`, parse payment requirements, auto-swap BTC to stablecoins, retry with proof of payment. Agents pay for APIs without thinking about it.
 - **MCP Server** — Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.
 
 ### NEXT
 
+- **x402 Client Support** — `cash pay <url>` command. Detect `402 Payment Required`, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5)).
 - **Spending Policies** — Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.
 - **More Auth Providers** — Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.
 
@@ -149,7 +149,7 @@ Your agent offers a service and gets paid by humans in stablecoins. It converts 
 Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
 
 **How does x402 payment work?**
-When an agent hits an API that returns `402 Payment Required`, Claw Cash reads the payment requirements (amount, token, chain, address), swaps BTC to the requested stablecoin on the fly via atomic swap, sends the payment, and retries the original request. The agent holds sats as its treasury and pays in whatever currency the API demands.
+When an agent hits an API that returns `402 Payment Required`, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in [#5](https://github.com/tiero/clw.cash/issues/5).
 
 **Where are the private keys stored?**
 Inside an Evervault Enclave. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel. Even if the host machine is compromised, the keys remain inaccessible.

@@ -15,6 +15,7 @@ export interface Env {
   EV_API_KEY: string;
 
   // Variables
+  ALLOW_TEST_AUTH: string;
   ENCLAVE_BASE_URL: string;
   TICKET_TTL_SECONDS: string;
   SESSION_TTL_SECONDS: string;

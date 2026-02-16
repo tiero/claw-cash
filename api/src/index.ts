@@ -30,8 +30,6 @@ app.use("/v1/*", async (c, next) => {
   return cors({
     origin: (origin) => {
       if (allowedOrigins.includes(origin)) return origin;
-      // Allow Cloudflare Pages preview deployments
-      if (/\.pages\.dev$/.test(origin)) return origin;
       return "";
     },
     allowMethods: ["GET", "POST", "DELETE", "OPTIONS"],
@@ -138,7 +136,8 @@ app.post("/v1/auth/challenge", async (c) => {
   const challenge = await store.createChallenge();
 
   const botEnabled = (c.env.TELEGRAM_BOT_TOKEN ?? "").length > 0;
-  if (!botEnabled && body.telegram_user_id) {
+  const testAuthAllowed = (c.env.ALLOW_TEST_AUTH ?? "") === "true";
+  if (!botEnabled && testAuthAllowed && body.telegram_user_id) {
     await store.resolveChallenge(challenge.id, body.telegram_user_id);
   }
 

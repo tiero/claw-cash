@@ -31,6 +31,7 @@ RATE_LIMIT_WINDOW_MS = "60000"
 RATE_LIMIT_PER_USER = "60"
 RATE_LIMIT_PER_IDENTITY_SIGN = "20"
 ALLOWED_ORIGINS = "http://localhost:5173"
+ALLOW_TEST_AUTH = "true"
 
 # Secrets (set via: wrangler secret put <NAME>)
 # INTERNAL_API_KEY

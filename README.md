@@ -213,5 +213,5 @@ ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 
 - [ ] MCP server for Claude Code / Claude Desktop tool-use integration
 - [ ] Spending policies — per-agent limits, allowlists, time-based rules
-- [ ] Persistent storage (replace in-memory store with PostgreSQL)
+- [ ] Enclave key preloading — auto-restore all identity keys from D1 backups on enclave startup
 - [ ] Webhook notifications for transaction events

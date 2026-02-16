@@ -100,6 +100,10 @@ Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a c
 
 The goal: the Privy of agents. Plug any auth provider, same enclave-backed identity underneath.
 
+## Payment Links
+
+Agents generate payment links. Humans pay with their wallet. No app downloads, no sign-ups — just connect and send. Payment page at pay.clw.cash.
+
 ## Hold Sats, Pay the World
 
 Agents accumulate and hold Bitcoin. When they need to pay for something — an x402-protected API, a stablecoin transfer, any fiat-denominated cost — they swap BTC to stablecoins on the fly. Bitcoin is the treasury, stablecoins are the payment rail.
@@ -123,6 +127,8 @@ Your agent offers a service and gets paid by humans in stablecoins. It converts 
 - **No counterparty risk**: No bank, no API to trust — just math and a peer-to-peer network
 - **Ark settlement**: Instant agent-to-agent transfers via VTXOs, no block confirmations needed
 
+More at [clw.cash/why](https://clw.cash/why)
+
 ## Roadmap
 
 ### NOW
@@ -139,6 +145,8 @@ Your agent offers a service and gets paid by humans in stablecoins. It converts 
 
 - **Persistent Storage** — Replace in-memory store with PostgreSQL. Durable state across restarts for production deployments.
 - **Webhook Notifications** — Get notified when transactions complete, swaps settle, or balances change. Push events to your agent's event loop.
+
+More at [clw.cash/roadmap](https://clw.cash/roadmap)
 
 ## FAQ
 
@@ -159,6 +167,8 @@ Yes. Claw Cash acts as a factory bot — your Telegram bot authenticates with a 
 
 **How fast are agent-to-agent payments?**
 Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immediately with minimal fees — no block confirmations needed. Lightning payments are also near-instant for paying external services.
+
+More at [clw.cash/faq](https://clw.cash/faq)
 
 ## Links
 

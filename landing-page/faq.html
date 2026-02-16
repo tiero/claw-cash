@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FAQ — Claw Cash</title>
+  <meta name="description" content="Frequently asked questions about Claw Cash. Bitcoin for agents, x402 payments, private key security, supported currencies.">
+
+  <link rel="canonical" href="https://clw.cash/faq">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://clw.cash/faq">
+  <meta property="og:title" content="FAQ — Claw Cash">
+  <meta property="og:description" content="Frequently asked questions about Bitcoin for agents.">
+  <meta property="og:site_name" content="Claw Cash">
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <div class="grain"></div>
+
+  <!-- Nav -->
+  <nav>
+    <div class="container">
+      <a href="/" class="nav-logo">🦞 <span class="claw">Claw</span> Cash</a>
+      <ul class="nav-links">
+        <li><a href="/why">Why</a></li>
+        <li><a href="/roadmap">Roadmap</a></li>
+        <li><a href="/faq" class="active">FAQ</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- FAQ -->
+  <section class="page-header" id="faq">
+    <div class="container">
+      <h2>FAQ</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Why Bitcoin instead of stablecoins?</summary>
+          <div class="faq-answer">
+            Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>How does x402 payment work?</summary>
+          <div class="faq-answer">
+            When an agent hits an API that returns <code>402 Payment Required</code>, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in <a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Where are the private keys stored?</summary>
+          <div class="faq-answer">
+            Inside an Evervault Enclave. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel. Even if the host machine is compromised, the keys remain inaccessible.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>What currencies and networks are supported?</summary>
+          <div class="faq-answer">
+            Bitcoin on-chain, Lightning, and Arkade (instant off-chain). For stablecoins: USDC and USDT on Polygon, Arbitrum, and Ethereum. The agent holds BTC and swaps to stablecoins on demand via LendaSwap and Boltz.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Can my Telegram bot use this?</summary>
+          <div class="faq-answer">
+            Yes. Claw Cash acts as a factory bot — your Telegram bot authenticates with a shared API key and gets per-user sessions via <code>POST /v1/auth/bot-session</code>. Each Telegram user gets their own enclave-backed identity. No user-facing auth flow needed.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>How fast are agent-to-agent payments?</summary>
+          <div class="faq-answer">
+            Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immediately with minimal fees — no block confirmations needed. Lightning payments are also near-instant for paying external services.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="get-started">
+    <div class="container" style="text-align: center;">
+      <h2>Ready to Get Started?</h2>
+      <p class="section-lead" style="margin: 24px auto 48px;">
+        One CLI. Bitcoin + stablecoins. Built for machines.
+      </p>
+      <div class="cta-group" style="justify-content: center;">
+        <a href="/" class="btn btn-primary">Get Started</a>
+        <a href="/why" class="btn btn-secondary">Why Bitcoin?</a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>
+        <a href="/SKILL.md">Agent Skill (SKILL.md)</a> ·
+        Built by <a href="https://github.com/tiero">tiero</a> ·
+        Powered by <a href="https://arkadeos.com">👾 Arkade</a> ·
+        <a href="https://t.me/arkade_os">Telegram</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

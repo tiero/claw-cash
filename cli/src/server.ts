@@ -1,6 +1,7 @@
 import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { CashContext } from "./context.js";
 import type { SwapMonitor } from "./monitor.js";
+import type { AuthMonitor } from "./authMonitor.js";
 import type { EvmChain, StablecoinToken, StablecoinSwapInfo, StablecoinSwapStatus } from "@clw-cash/skills";
 
 const LENDASWAP_API = "https://apilendaswap.lendasat.com";
@@ -52,6 +53,7 @@ export interface DaemonServerOpts {
   port: number;
   ctx: CashContext;
   monitor: SwapMonitor;
+  authMonitor: AuthMonitor;
 }
 
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -69,7 +71,7 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 
 export function createDaemonServer(opts: DaemonServerOpts): Server {
-  const { ctx, monitor } = opts;
+  const { ctx, monitor, authMonitor } = opts;
   const startTime = Date.now();
 
   const server = createServer(async (req, res) => {
@@ -257,6 +259,59 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
       if (method === "GET" && url.pathname === "/balance") {
         const balance = await ctx.bitcoin.getBalance();
         return json(res, 200, balance);
+      }
+
+      // POST /auth/start — begin non-blocking auth, daemon polls in background
+      if (method === "POST" && url.pathname === "/auth/start") {
+        const body = await readBody(req);
+        const botToken = body.botToken as string;
+        const chatId = body.chatId as number;
+        const messageId = body.messageId as number;
+
+        if (!botToken || !chatId || !messageId) {
+          return json(res, 400, { error: "Missing botToken, chatId, or messageId" });
+        }
+
+        const { loadConfig } = await import("./config.js");
+        const config = loadConfig();
+
+        // Request a challenge from the API
+        const challengeRes = await fetch(`${config.apiBaseUrl}/v1/auth/challenge`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        if (!challengeRes.ok) {
+          const text = await challengeRes.text();
+          return json(res, 502, { error: `Challenge request failed: ${text}` });
+        }
+
+        const challenge = (await challengeRes.json()) as {
+          challenge_id: string;
+          deep_link: string | null;
+        };
+
+        // Start background polling
+        authMonitor.watch({
+          challengeId: challenge.challenge_id,
+          deepLink: challenge.deep_link,
+          apiBaseUrl: config.apiBaseUrl,
+          botToken,
+          chatId,
+          messageId,
+          createdAt: Date.now(),
+        });
+
+        return json(res, 200, {
+          challengeId: challenge.challenge_id,
+          deepLink: challenge.deep_link,
+        });
+      }
+
+      // GET /auth/status — check if auth is still polling or resolved
+      if (method === "GET" && url.pathname === "/auth/status") {
+        return json(res, 200, authMonitor.getStatus());
       }
 
       return json(res, 404, { error: "Not found" });

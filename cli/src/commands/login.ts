@@ -1,11 +1,41 @@
 import { loadConfig, saveConfig } from "../config.js";
 import { outputSuccess, outputError } from "../output.js";
 import { getDaemonStatus, stopDaemon, startDaemonInBackground, getPort } from "../daemon.js";
+import { daemonPost } from "../daemonClient.js";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
 
-export async function handleLogin(): Promise<never> {
+export async function handleLogin(argv?: Record<string, unknown>): Promise<never> {
+  // Non-blocking mode: delegate to daemon for background polling + Telegram reply
+  if (argv?.start) {
+    const botToken = argv["bot-token"] as string;
+    const chatId = Number(argv["chat-id"]);
+    const messageId = Number(argv["message-id"]);
+
+    if (!botToken || !chatId || !messageId) {
+      return outputError("--start requires --bot-token, --chat-id, and --message-id");
+    }
+
+    const status = getDaemonStatus();
+    if (!status.running) {
+      return outputError("Daemon is not running. Run 'cash start' first.");
+    }
+
+    const result = (await daemonPost("/auth/start", {
+      botToken,
+      chatId,
+      messageId,
+    })) as { challengeId: string; deepLink: string | null };
+
+    return outputSuccess({
+      message: "Auth started. Daemon will poll and reply via Telegram when done.",
+      challengeId: result.challengeId,
+      deepLink: result.deepLink,
+    });
+  }
+
+  // Original blocking mode
   const config = loadConfig();
 
   if (!config.apiBaseUrl) {

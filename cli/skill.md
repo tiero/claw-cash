@@ -2,7 +2,7 @@
 
 A command-line tool for sending and receiving Bitcoin and stablecoins. Keys are held in a secure enclave — the CLI never touches private keys.
 
-All commands output JSON to stdout. Exit code 0 = success, 1 = error.
+Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = success, 1 = error.
 
 ## Setup
 
@@ -17,7 +17,7 @@ cash login
 
 If the session token expires, run `cash login` to re-authenticate. If the daemon stops, restart it with `cash start`.
 
-You can also pass a token explicitly: `cash init --api-url <url> --token <jwt> --ark-server <url>`.
+You can also pass flags explicitly: `cash init --api-url <url> --token <jwt> --ark-server <url> --network <bitcoin|testnet>`.
 
 Or set environment variables:
 
@@ -27,6 +27,8 @@ CLW_SESSION_TOKEN=<jwt>
 CLW_IDENTITY_ID=<uuid>
 CLW_PUBLIC_KEY=<hex>
 CLW_ARK_SERVER_URL=https://ark.clw.cash
+CLW_NETWORK=bitcoin          # bitcoin or testnet
+CLW_DAEMON_PORT=3457          # default: 3457
 ```
 
 ## Commands
@@ -77,8 +79,13 @@ cash receive --amount 100000 --currency btc --where onchain
 ### Receive Stablecoins (Stablecoin to BTC swap)
 
 ```bash
-# Receive USDT from Polygon (swap to BTC)
-cash receive --amount 10 --currency usdt --where polygon --address <0x-sender-address>
+# Receive stablecoins — sender picks chain on web page (no --where)
+cash receive --amount 10 --currency usdt
+# -> {"ok": true, "data": {"paymentUrl": "https://pay.clw.cash?amount=10&to=ark1q...&currency=usdt", "amount": 10, "currency": "usdt", "targetAddress": "ark1q..."}}
+
+# Receive stablecoins — specify chain (creates swap, generates payment URL with swap ID)
+cash receive --amount 10 --currency usdt --where polygon
+# -> {"ok": true, "data": {"paymentUrl": "https://pay.clw.cash?id=<swapId>", "swapId": "...", "amount": 10, "token": "usdt0_pol", "chain": "polygon", "targetAddress": "ark1q..."}}
 ```
 
 ### Check Balance
@@ -88,12 +95,19 @@ cash balance
 # -> {"ok": true, "data": {"total": 250000, "offchain": {"settled": 50000, "preconfirmed": 20000, "available": 70000}, "onchain": {"confirmed": 30000, "total": 30000}}}
 ```
 
+### Configuration
+
+```bash
+cash config
+# -> {"ok": true, "data": {"apiBaseUrl": {"value": "...", "source": "file"}, "payBaseUrl": "...", "arkServerUrl": {"value": "...", "source": "..."}, "network": {"value": "bitcoin", "source": "default"}, ..., "daemonPort": 3457, "configFile": "~/.clw-cash/config.json", "dataDir": "~/.clw-cash/data", "session": "active", "sessionExpiresAt": 1739...}}
+```
+
 ### Swap Management
 
 ```bash
 # Check a single swap by ID
 cash swap <swap-id>
-# -> {"ok": true, "data": {"id": "...", "status": "funded", "direction": "btc_to_stablecoin", "local": {...}, "remote": {...}}}
+# -> {"ok": true, "data": {"id": "...", "status": "funded", "direction": "btc_to_stablecoin", "local": {"direction": "...", "status": "...", "sourceToken": "...", "targetToken": "...", "sourceAmount": ..., "targetAmount": ..., "exchangeRate": ..., "createdAt": "...", "completedAt": null, "txid": null}, "remote": {...}}}
 
 # List swaps (grouped by status, last 5 per category)
 cash swaps
@@ -107,9 +121,16 @@ cash swaps --claimed --limit 10
 cash claim <swap-id>
 # -> {"ok": true, "data": {"success": true, "txHash": "0x...", "chain": "polygon"}}
 
-# Refund an expired swap
+# Refund a BTC→Stablecoin swap (refunds directly via SDK)
 cash refund <swap-id>
 # -> {"ok": true, "data": {"success": true, "txId": "...", "refundAmount": 95000}}
+
+# Refund a Stablecoin→BTC swap (returns unsigned EVM tx call data)
+cash refund <swap-id>
+# -> {"ok": true, "data": {"type": "evm_refund", "swapId": "...", "timelockExpired": true, "timelockExpiry": "...", "transaction": {"to": "0x...", "data": "0x..."}}}
+
+# Optional: specify refund destination
+cash refund <swap-id> --address <destination>
 ```
 
 ### Daemon (Swap Monitoring)
@@ -120,10 +141,11 @@ The daemon runs in the background to automatically claim Lightning HTLCs and mon
 # Start the daemon
 cash start
 # -> {"ok": true, "data": {"started": true, "pid": 12345, "port": 3457}}
+# (if already running: {"ok": true, "data": {"started": false, "reason": "already_running", "pid": 12345, "port": 3457}})
 
 # Check daemon and session status
 cash status
-# -> {"ok": true, "data": {"session": "active", "sessionExpiresAt": 1739..., "daemon": {"running": true, "pid": 12345, "port": 3457}}}
+# -> {"ok": true, "data": {"session": "active", "sessionExpiresAt": 1739..., "sessionRemainingSeconds": 3200, "daemon": {"running": true, "pid": 12345, "port": 3457, "detail": {...}}}}
 
 # List pending swaps
 cash swaps --pending
@@ -131,17 +153,18 @@ cash swaps --pending
 # Stop the daemon
 cash stop
 # -> {"ok": true, "data": {"stopped": true, "pid": 12345}}
+# (if not running: {"ok": true, "data": {"stopped": false, "reason": "not_running"}})
 ```
 
 ## Output Format
 
-Success:
+Success (stdout):
 
 ```json
 {"ok": true, "data": { ... }}
 ```
 
-Error:
+Error (stderr):
 
 ```json
 {"ok": false, "error": "description of what went wrong"}
@@ -200,6 +223,9 @@ cash receive --amount 50000 --currency btc --where lightning | jq -r .data.bolt1
 
 # Get the ark address for receiving
 cash receive --amount 100000 --currency btc --where arkade | jq -r .data.address
+
+# Get the payment URL for stablecoin receive
+cash receive --amount 10 --currency usdc | jq -r .data.paymentUrl
 
 # Check if a command succeeded
 cash send ... && echo "sent" || echo "failed"

@@ -9,6 +9,7 @@ import {
   toStablecoinToken,
   toEvmChain,
   resolveCurrency,
+  parseBtcAmount,
 } from "../utils/token.js";
 import type { ParsedArgs } from "minimist";
 
@@ -88,9 +89,15 @@ export async function handleSend(
   }
 
   const resolved = resolveCurrency(currency);
-  const amount = resolved === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
-  if (isNaN(amount) || amount <= 0) {
-    return outputError(`Invalid amount: ${amountStr}`);
+
+  let amount: number;
+  if (resolved === "btc") {
+    const sats = parseBtcAmount(amountStr, currency);
+    if (sats === null) return outputError(`Invalid amount: ${amountStr}`);
+    amount = sats;
+  } else {
+    amount = parseFloat(amountStr);
+    if (isNaN(amount) || amount <= 0) return outputError(`Invalid amount: ${amountStr}`);
   }
 
   if (!isValidWhere(where)) {

@@ -29,6 +29,18 @@ export function btcToSats(btc: number): number {
   return Math.round(btc * 1e8);
 }
 
+/** Parse a BTC/sats amount string to satoshis. "btc" amounts are in BTC, "sats" amounts are in sats. */
+export function parseBtcAmount(amountStr: string, currency: Currency): number | null {
+  if (currency === "sats") {
+    const sats = parseInt(amountStr, 10);
+    return isNaN(sats) || sats <= 0 ? null : sats;
+  }
+  // currency === "btc" — amount is in BTC, convert to sats
+  const btc = parseFloat(amountStr);
+  if (isNaN(btc) || btc <= 0) return null;
+  return btcToSats(btc);
+}
+
 export function isValidWhere(s: string): s is Where {
   return BTC_NETWORKS.has(s) || EVM_CHAINS.has(s);
 }

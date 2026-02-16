@@ -7,6 +7,7 @@ import {
   validateCurrencyWhere,
   toStablecoinToken,
   resolveCurrency,
+  parseBtcAmount,
 } from "../utils/token.js";
 import type { CashConfig } from "../config.js";
 import type { ParsedArgs } from "minimist";
@@ -76,7 +77,7 @@ export async function handleReceive(
   if (!amountStr && (where === "lightning" || resolved !== "btc")) {
     return outputError(
       resolved === "btc"
-        ? "Missing --amount <sats> (required for lightning invoices)"
+        ? `Missing --amount (${currency === "sats" ? "sats" : "BTC"} required for lightning invoices)`
         : `Missing --amount <${resolved}> (e.g. --amount 10 for 10 ${resolved.toUpperCase()})`
     );
   }
@@ -84,9 +85,13 @@ export async function handleReceive(
   // Parse amount (optional for arkade/onchain)
   let amount: number | undefined;
   if (amountStr) {
-    amount = resolved === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) {
-      return outputError(`Invalid amount: ${amountStr}`);
+    if (resolved === "btc") {
+      const sats = parseBtcAmount(amountStr, currency);
+      if (sats === null) return outputError(`Invalid amount: ${amountStr}`);
+      amount = sats;
+    } else {
+      amount = parseFloat(amountStr);
+      if (isNaN(amount) || amount <= 0) return outputError(`Invalid amount: ${amountStr}`);
     }
   }
 

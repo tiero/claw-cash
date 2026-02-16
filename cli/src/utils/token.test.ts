@@ -5,6 +5,7 @@ import {
   resolveCurrency,
   satsToBtc,
   btcToSats,
+  parseBtcAmount,
   isValidWhere,
   validateCurrencyWhere,
   toStablecoinToken,
@@ -57,6 +58,34 @@ describe("satsToBtc / btcToSats", () => {
   it("rounds sub-satoshi amounts", () => {
     assert.equal(btcToSats(0.000000016), 2); // 1.6 → 2
     assert.equal(btcToSats(0.000000014), 1); // 1.4 → 1
+  });
+});
+
+describe("parseBtcAmount", () => {
+  it("currency=sats treats amount as satoshis", () => {
+    assert.equal(parseBtcAmount("421", "sats"), 421);
+    assert.equal(parseBtcAmount("100000", "sats"), 100_000);
+    assert.equal(parseBtcAmount("1", "sats"), 1);
+  });
+
+  it("currency=btc treats amount as BTC and converts to sats", () => {
+    assert.equal(parseBtcAmount("1", "btc"), 100_000_000);
+    assert.equal(parseBtcAmount("0.001", "btc"), 100_000);
+    assert.equal(parseBtcAmount("0.00000001", "btc"), 1);
+    assert.equal(parseBtcAmount("21000000", "btc"), 2_100_000_000_000_000);
+  });
+
+  it("currency=btc with amount 421 returns 42.1B sats", () => {
+    assert.equal(parseBtcAmount("421", "btc"), 42_100_000_000);
+  });
+
+  it("rejects invalid amounts", () => {
+    assert.equal(parseBtcAmount("0", "sats"), null);
+    assert.equal(parseBtcAmount("-5", "sats"), null);
+    assert.equal(parseBtcAmount("abc", "sats"), null);
+    assert.equal(parseBtcAmount("0", "btc"), null);
+    assert.equal(parseBtcAmount("-1", "btc"), null);
+    assert.equal(parseBtcAmount("abc", "btc"), null);
   });
 });
 

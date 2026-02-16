@@ -1,6 +1,6 @@
 {
   "name": "clw-cash",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "description": "Bitcoin & Stablecoin agent wallet CLI. Keys held in a secure enclave.",
   "type": "module",
   "bin": {

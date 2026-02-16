@@ -6,6 +6,7 @@ import {
   isValidWhere,
   validateCurrencyWhere,
   toStablecoinToken,
+  resolveCurrency,
 } from "../utils/token.js";
 import type { CashConfig } from "../config.js";
 import type { ParsedArgs } from "minimist";
@@ -20,17 +21,19 @@ export async function handleReceive(
   const where = args.where as string | undefined;
 
   if (!currency) {
-    return outputError("Missing --currency <btc|usdt|usdc>");
+    return outputError("Missing --currency <btc|sats|usdt|usdc>");
   }
 
   if (!isValidCurrency(currency)) {
     return outputError(
-      `Invalid currency: ${currency}. Expected: btc, usdt, usdc`
+      `Invalid currency: ${currency}. Expected: btc, sats, usdt, usdc`
     );
   }
 
+  const resolved = resolveCurrency(currency);
+
   // Stablecoins: --where is optional (sender picks chain on web page)
-  if (currency !== "btc" && !where) {
+  if (resolved !== "btc" && !where) {
     if (!amountStr) {
       return outputError(
         `Missing --amount <${currency}> (e.g. --amount 10 for 10 ${currency.toUpperCase()})`
@@ -64,32 +67,32 @@ export async function handleReceive(
     );
   }
 
-  const validationError = validateCurrencyWhere(currency, where);
+  const validationError = validateCurrencyWhere(resolved, where);
   if (validationError) {
     return outputError(validationError);
   }
 
   // Amount is required for lightning invoices and stablecoin swaps
-  if (!amountStr && (where === "lightning" || currency !== "btc")) {
+  if (!amountStr && (where === "lightning" || resolved !== "btc")) {
     return outputError(
-      currency === "btc"
+      resolved === "btc"
         ? "Missing --amount <sats> (required for lightning invoices)"
-        : `Missing --amount <${currency}> (e.g. --amount 10 for 10 ${currency.toUpperCase()})`
+        : `Missing --amount <${resolved}> (e.g. --amount 10 for 10 ${resolved.toUpperCase()})`
     );
   }
 
   // Parse amount (optional for arkade/onchain)
   let amount: number | undefined;
   if (amountStr) {
-    amount = currency === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
+    amount = resolved === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
     if (isNaN(amount) || amount <= 0) {
       return outputError(`Invalid amount: ${amountStr}`);
     }
   }
 
   // Stablecoin receive: create swap via SDK (CLI owns preimage for claiming) and generate payment URL
-  if (currency !== "btc") {
-    const sourceToken = toStablecoinToken(currency, where);
+  if (resolved !== "btc") {
+    const sourceToken = toStablecoinToken(resolved, where);
     const arkAddress = await ctx.bitcoin.getArkAddress();
 
     const result = await ctx.swap.swapStablecoinToBtc({
@@ -114,7 +117,7 @@ export async function handleReceive(
 
   // BTC routes — proxy through daemon when running
   if (getDaemonUrl()) {
-    const body: Record<string, unknown> = { amount, currency, where };
+    const body: Record<string, unknown> = { amount, currency: resolved, where };
     const result = await daemonPost("/receive", body);
     return outputSuccess(result);
   }

@@ -8,6 +8,7 @@ import {
   validateCurrencyWhere,
   toStablecoinToken,
   toEvmChain,
+  resolveCurrency,
 } from "../utils/token.js";
 import type { ParsedArgs } from "minimist";
 
@@ -74,21 +75,22 @@ export async function handleSend(
     return outputError("Missing --amount <value> (sats for btc, units for usdt/usdc)");
   }
   if (!currency) {
-    return outputError("Missing --currency <btc|usdt|usdc>");
+    return outputError("Missing --currency <btc|sats|usdt|usdc>");
   }
   if (!where) {
     return outputError("Missing --where <onchain|lightning|arkade|polygon|arbitrum|ethereum>");
   }
 
-  const amount = currency === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
-  if (isNaN(amount) || amount <= 0) {
-    return outputError(`Invalid amount: ${amountStr}`);
-  }
-
   if (!isValidCurrency(currency)) {
     return outputError(
-      `Invalid currency: ${currency}. Expected: btc, usdt, usdc`
+      `Invalid currency: ${currency}. Expected: btc, sats, usdt, usdc`
     );
+  }
+
+  const resolved = resolveCurrency(currency);
+  const amount = resolved === "btc" ? parseInt(amountStr, 10) : parseFloat(amountStr);
+  if (isNaN(amount) || amount <= 0) {
+    return outputError(`Invalid amount: ${amountStr}`);
   }
 
   if (!isValidWhere(where)) {
@@ -97,7 +99,7 @@ export async function handleSend(
     );
   }
 
-  const validationError = validateCurrencyWhere(currency, where);
+  const validationError = validateCurrencyWhere(resolved, where);
   if (validationError) {
     return outputError(validationError);
   }
@@ -108,11 +110,11 @@ export async function handleSend(
 
   // Proxy through daemon when running (swap stays in daemon process for monitoring)
   if (getDaemonUrl()) {
-    const body: Record<string, unknown> = { currency, where, to };
-    if (currency === "btc") {
+    const body: Record<string, unknown> = { currency: resolved, where, to };
+    if (resolved === "btc") {
       body.amount = amount;
     } else {
-      const targetToken = toStablecoinToken(currency, where);
+      const targetToken = toStablecoinToken(resolved, where);
       body.targetToken = targetToken;
       body.targetChain = toEvmChain(where);
       body.targetAmount = amount;
@@ -122,7 +124,7 @@ export async function handleSend(
   }
 
   // BTC routes (no daemon — direct execution)
-  if (currency === "btc") {
+  if (resolved === "btc") {
     if (where === "lightning") {
       const result = await ctx.lightning.payInvoice({ bolt11: to });
       return outputSuccess(result);
@@ -134,7 +136,7 @@ export async function handleSend(
   }
 
   // Stablecoin routes (usdt/usdc -> swap BTC to stablecoin)
-  const targetToken = toStablecoinToken(currency, where);
+  const targetToken = toStablecoinToken(resolved, where);
   const targetChain = toEvmChain(where);
 
   const result = await ctx.swap.swapBtcToStablecoin({

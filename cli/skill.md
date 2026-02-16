@@ -172,11 +172,11 @@ Error (stderr):
 
 ## Currency & Network Matrix
 
-| Currency | Networks                    |
-| -------- | --------------------------- |
-| btc      | onchain, lightning, arkade  |
-| usdt     | polygon, ethereum, arbitrum |
-| usdc     | polygon, ethereum, arbitrum |
+| Currency   | Networks                    | Notes                          |
+| ---------- | --------------------------- | ------------------------------ |
+| btc / sats | onchain, lightning, arkade  | Both accept amounts in satoshis |
+| usdt       | polygon, ethereum, arbitrum |                                |
+| usdc       | polygon, ethereum, arbitrum |                                |
 
 ## Swap Status Lifecycle
 

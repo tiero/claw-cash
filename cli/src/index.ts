@@ -19,10 +19,10 @@ import { handleConfig } from "./commands/config.js";
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
 Usage:
-  cash send --amount <sats> --currency <btc|usdt|usdc> --where <network> --to <destination>
+  cash send --amount <sats> --currency <btc|sats|usdt|usdc> --where <network> --to <destination>
   cash send <bolt11_invoice>
   cash send <bip21_uri>
-  cash receive --amount <sats> --currency <btc|usdt|usdc> --where <network>
+  cash receive --amount <sats> --currency <btc|sats|usdt|usdc> --where <network>
   cash balance
   cash init --api-url <url> --token <jwt> --ark-server <url>
   cash login                  Re-authenticate via Telegram (refresh token)
@@ -38,7 +38,7 @@ Usage:
   cash refund <swapId>          Manually refund a swap
     --address <destination>     Refund destination (optional)
 
-Currency: btc | usdt | usdc
+Currency: btc | sats | usdt | usdc  (sats = btc, amounts always in satoshis)
 Where:    onchain | lightning | arkade | polygon | arbitrum | ethereum
 
 Examples:

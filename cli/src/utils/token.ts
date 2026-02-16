@@ -8,19 +8,33 @@ const TOKEN_MAP: Record<string, Record<string, StablecoinToken>> = {
 const BTC_NETWORKS = new Set(["onchain", "lightning", "arkade"]);
 const EVM_CHAINS = new Set(["polygon", "ethereum", "arbitrum"]);
 
-export type Currency = "btc" | "usdt" | "usdc";
+export type Currency = "btc" | "sats" | "usdt" | "usdc";
+export type ResolvedCurrency = "btc" | "usdt" | "usdc";
 export type Where = "onchain" | "lightning" | "arkade" | "polygon" | "arbitrum" | "ethereum";
 
 export function isValidCurrency(s: string): s is Currency {
-  return s === "btc" || s === "usdt" || s === "usdc";
+  return s === "btc" || s === "sats" || s === "usdt" || s === "usdc";
+}
+
+/** Normalize "sats" → "btc" for internal use */
+export function resolveCurrency(c: Currency): ResolvedCurrency {
+  return c === "sats" ? "btc" : c;
+}
+
+export function satsToBtc(sats: number): number {
+  return sats / 1e8;
+}
+
+export function btcToSats(btc: number): number {
+  return Math.round(btc * 1e8);
 }
 
 export function isValidWhere(s: string): s is Where {
   return BTC_NETWORKS.has(s) || EVM_CHAINS.has(s);
 }
 
-export function validateCurrencyWhere(currency: Currency, where: Where): string | null {
-  if (currency === "btc" && !BTC_NETWORKS.has(where)) {
+export function validateCurrencyWhere(currency: Currency | ResolvedCurrency, where: Where): string | null {
+  if ((currency === "btc" || currency === "sats") && !BTC_NETWORKS.has(where)) {
     return `btc can only be sent to: onchain, lightning, arkade (got: ${where})`;
   }
   if ((currency === "usdt" || currency === "usdc") && !EVM_CHAINS.has(where)) {

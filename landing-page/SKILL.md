@@ -179,6 +179,45 @@ cash stop
 # (if not running: {"ok": true, "data": {"stopped": false, "reason": "not_running"}})
 ```
 
+### Swap Event Webhooks
+
+Register a webhook URL to receive notifications when the daemon claims, refunds, or fails a swap. Webhooks are in-memory (re-register after daemon restart).
+
+```bash
+# Register for swap event notifications (daemon HTTP API, default port 3457)
+curl -X POST http://127.0.0.1:3457/notify/register \
+  -H 'content-type: application/json' \
+  -d '{"url": "https://my-bot/webhook", "events": ["swap.claimed", "swap.refunded", "swap.failed"]}'
+# -> {"id": "<uuid>", "url": "https://my-bot/webhook", "events": ["swap.claimed", "swap.refunded", "swap.failed"]}
+
+# List active webhooks
+curl http://127.0.0.1:3457/notify
+# -> {"webhooks": [{"id": "...", "url": "...", "events": [...]}]}
+
+# Unregister a webhook
+curl -X DELETE http://127.0.0.1:3457/notify/<id>
+# -> {"removed": true}
+```
+
+Webhook payload (POST to registered URL):
+
+```json
+{
+  "event": "swap.claimed",
+  "swapId": "abc123...",
+  "status": "completed",
+  "direction": "btc_to_stablecoin",
+  "sourceAmount": 100000,
+  "sourceToken": "btc_arkade",
+  "targetAmount": 10.5,
+  "targetToken": "usdc_pol",
+  "message": "Swap abc123... claimed successfully",
+  "timestamp": "2026-02-16T12:00:00Z"
+}
+```
+
+Events: `swap.claimed`, `swap.refunded`, `swap.failed`.
+
 ## Output Format
 
 Success (stdout):

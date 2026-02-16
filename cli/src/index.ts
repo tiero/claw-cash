@@ -264,9 +264,11 @@ async function runDaemon() {
   console.error(`[daemon] starting on port ${port}...`);
 
   const ctx = await createContext(config, { enableSwapManager: true });
-  const monitor = new SwapMonitor(ctx);
+  const { WebhookRegistry } = await import("./notifier.js");
+  const webhookRegistry = new WebhookRegistry();
+  const monitor = new SwapMonitor(ctx, { onEvent: (e) => webhookRegistry.dispatch(e) });
   const authMonitor = new AuthMonitor();
-  const server = createDaemonServer({ port, ctx, monitor, authMonitor });
+  const server = createDaemonServer({ port, ctx, monitor, authMonitor, webhookRegistry });
 
   // Start Lightning SwapManager
   await ctx.lightning.startSwapManager();

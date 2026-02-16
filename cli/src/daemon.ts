@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { readFileSync, writeFileSync, unlinkSync, mkdirSync, openSync } from "node:fs";
 import { join } from "node:path";
 import { homedir } from "node:os";
-import { resolve } from "node:path";
 
 const CONFIG_DIR = join(homedir(), ".clw-cash");
 const PID_FILE = join(CONFIG_DIR, "daemon.pid");
@@ -60,12 +59,13 @@ export async function startDaemonInBackground(port: number): Promise<{ pid: numb
   mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
 
   const logFd = openSync(LOG_FILE, "a");
-  const entrypoint = resolve(process.cwd(), "cli/src/index.ts");
 
-  // Find tsx binary
-  const tsxBin = resolve(process.cwd(), "node_modules/.bin/tsx");
+  // Use the same node binary and entrypoint that's currently running
+  // This works both in dev (tsx cli/src/index.ts) and production (node dist/index.js)
+  const nodeBin = process.execPath;
+  const entrypoint = process.argv[1];
 
-  const child = spawn(tsxBin, [entrypoint, "--daemon-internal", "--port", String(port)], {
+  const child = spawn(nodeBin, [entrypoint, "--daemon-internal", "--port", String(port)], {
     cwd: process.cwd(),
     env: { ...process.env },
     detached: true,

@@ -49,7 +49,7 @@ const sealKey = async (plaintextHex: string): Promise<string> => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(plaintextHex)
     });
-    if (res.ok) return await res.text();
+    if (res.ok) return (await res.json()) as string;
   } catch {
     // Evervault runtime not available — fall back to local AES
   }
@@ -63,7 +63,7 @@ const unsealKey = async (sealed: string): Promise<string> => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(sealed)
     });
-    if (res.ok) return await res.text();
+    if (res.ok) return (await res.json()) as string;
   } catch {
     // Evervault runtime not available — fall back to local AES
   }

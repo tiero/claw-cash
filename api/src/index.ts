@@ -75,10 +75,15 @@ async function enforceRate(limiter: KVRateLimiter, key: string, env: Env): Promi
   if (!ok) throw new HTTPException(429, { message: "Rate limit exceeded" });
 }
 
+function stripWrappingQuotes(s: string): string {
+  if (s.startsWith('"') && s.endsWith('"')) return s.slice(1, -1);
+  return s;
+}
+
 async function restoreBackup(store: CloudflareStore, enclave: EnclaveClient, identityId: string): Promise<boolean> {
   const backup = await store.getBackup(identityId);
   if (!backup) return false;
-  await enclave.importKey(identityId, backup.alg, backup.sealed_key);
+  await enclave.importKey(identityId, backup.alg, stripWrappingQuotes(backup.sealed_key));
   return true;
 }
 
@@ -234,7 +239,7 @@ app.post("/v1/identities/:id/restore", requireAuth, async (c) => {
   const backup = await store.getBackup(identityId);
   if (!backup) throw new HTTPException(404, { message: "No backup found for this identity" });
 
-  await enclave.importKey(identityId, backup.alg, backup.sealed_key);
+  await enclave.importKey(identityId, backup.alg, stripWrappingQuotes(backup.sealed_key));
 
   const body = (await c.req.json()) as { public_key?: string };
   if (!body.public_key) throw new HTTPException(400, { message: "Missing public_key in request body" });

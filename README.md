@@ -36,7 +36,7 @@ infra/        Enclave config and deployment
 npm i -g claw-cash
 ```
 
-The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. Full command reference and agent tips: [cli/SKILL.md](cli/SKILL.md).
+The CLI outputs JSON to stdout, designed to be called by AI agents as a subprocess tool. Full command reference and agent tips: [SKILL.md](https://clw.cash/SKILL.md).
 
 ## Quickstart
 

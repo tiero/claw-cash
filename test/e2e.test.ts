@@ -413,6 +413,114 @@ describe("Sealed backup export / import", () => {
   });
 });
 
+describe("Identity listing and recovery", () => {
+  let sessionToken: string;
+  let identityId: string;
+  let publicKey: string;
+
+  it("setup: authenticate", async () => {
+    const challenge = await post("/v1/auth/challenge", {
+      telegram_user_id: "list_test_user_" + Date.now(),
+    });
+    const { json } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
+    });
+    sessionToken = json.token;
+  });
+
+  it("GET /v1/identities — empty list for new user", async () => {
+    const { status, json } = await get("/v1/identities", sessionToken);
+    expect(status).toBe(200);
+    expect(json.items).toEqual([]);
+  });
+
+  it("GET /v1/identities — returns created identity", async () => {
+    const created = await post("/v1/identities", { alg: "secp256k1" }, sessionToken);
+    expect(created.status).toBe(201);
+    identityId = created.json.id;
+    publicKey = created.json.public_key;
+
+    const { status, json } = await get("/v1/identities", sessionToken);
+    expect(status).toBe(200);
+    expect(json.items.length).toBe(1);
+    expect(json.items[0].id).toBe(identityId);
+    expect(json.items[0].public_key).toBe(publicKey);
+    expect(json.items[0].status).toBe("active");
+  });
+
+  it("GET /v1/identities — excludes destroyed identities", async () => {
+    await del(`/v1/identities/${identityId}`, sessionToken);
+    const { status, json } = await get("/v1/identities", sessionToken);
+    expect(status).toBe(200);
+    expect(json.items).toEqual([]);
+  });
+
+  it("GET /v1/identities — multiple identities sorted by created_at DESC", async () => {
+    const first = await post("/v1/identities", { alg: "secp256k1" }, sessionToken);
+    const second = await post("/v1/identities", { alg: "secp256k1" }, sessionToken);
+
+    const { status, json } = await get("/v1/identities", sessionToken);
+    expect(status).toBe(200);
+    expect(json.items.length).toBe(2);
+    // Most recent first
+    expect(json.items[0].id).toBe(second.json.id);
+    expect(json.items[1].id).toBe(first.json.id);
+
+    // Cleanup
+    await del(`/v1/identities/${first.json.id}`, sessionToken);
+    await del(`/v1/identities/${second.json.id}`, sessionToken);
+  });
+
+  it("GET /v1/identities — requires auth", async () => {
+    const res = await fetch(`${API_BASE}/v1/identities`, { method: "GET" });
+    expect(res.status).toBe(401);
+  });
+
+  it("recovery: restore identity via listing after config wipe", async () => {
+    // Create a fresh identity
+    const created = await post("/v1/identities", { alg: "secp256k1" }, sessionToken);
+    expect(created.status).toBe(201);
+    const recoveryId = created.json.id;
+    const recoveryPubKey = created.json.public_key;
+
+    // Simulate config wipe: user only has session token, no identityId
+    // Step 1: List identities to discover existing ones
+    const listed = await get("/v1/identities", sessionToken);
+    expect(listed.json.items.length).toBeGreaterThan(0);
+    const found = listed.json.items[0];
+    expect(found.id).toBe(recoveryId);
+    expect(found.public_key).toBe(recoveryPubKey);
+
+    // Step 2: Restore the discovered identity
+    const restored = await post(
+      `/v1/identities/${found.id}/restore`,
+      { public_key: found.public_key },
+      sessionToken
+    );
+    expect(restored.status).toBe(200);
+
+    // Step 3: Verify signing still works with the recovered identity
+    const digest = randomBytes(32).toString("hex");
+    const intent = await post(
+      `/v1/identities/${found.id}/sign-intent`,
+      { digest, scope: "sign" },
+      sessionToken
+    );
+    expect(intent.status).toBe(201);
+
+    const signed = await post(
+      `/v1/identities/${found.id}/sign`,
+      { digest, ticket: intent.json.ticket },
+      sessionToken
+    );
+    expect(signed.status).toBe(200);
+    expect(signed.json.signature).toBeDefined();
+
+    // Cleanup
+    await del(`/v1/identities/${recoveryId}`, sessionToken);
+  });
+});
+
 describe("Auth guards", () => {
   it("POST /v1/identities without token returns 401", async () => {
     const { status } = await post("/v1/identities", { alg: "secp256k1" });

@@ -21,7 +21,7 @@ cash init
 cash login
 ```
 
-`init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). It creates an identity, saves config to `~/.clw-cash/config.json`, and **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
+`init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). If an identity already exists on the server (e.g., from a previous install or sandbox reset), it **auto-recovers** it instead of creating a new one. Config is saved to `~/.clw-cash/config.json`, and it **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
 
 If the session token expires, run `cash login` to re-authenticate. If the daemon stops, restart it with `cash start`.
 

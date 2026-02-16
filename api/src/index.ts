@@ -198,6 +198,14 @@ app.post("/telegram-webhook", async (c) => {
 
 // ── Identities ────────────────────────────────────────────────
 
+app.get("/v1/identities", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  const store = getStore(c.env);
+  const user = await currentUser(store, auth.sub);
+  const identities = await store.listIdentitiesForUser(user.id);
+  return c.json({ items: identities });
+});
+
 app.post("/v1/identities", requireAuth, async (c) => {
   const auth = c.get("auth");
   const store = getStore(c.env);

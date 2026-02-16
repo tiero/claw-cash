@@ -78,7 +78,7 @@ export class AuthMonitor {
         config.sessionToken = session.token;
         saveConfig(config);
 
-        // Restore identity if exists
+        // Restore or recover identity
         if (config.identityId && config.publicKey) {
           try {
             const restoreRes = await fetch(
@@ -97,6 +97,41 @@ export class AuthMonitor {
             }
           } catch (err) {
             console.error(`[auth-monitor] identity restore error: ${err}`);
+          }
+        } else {
+          // Config wiped — try to recover existing identity from server
+          try {
+            const listRes = await fetch(`${auth.apiBaseUrl}/v1/identities`, {
+              headers: { authorization: `Bearer ${session.token}` },
+            });
+            if (listRes.ok) {
+              const data = (await listRes.json()) as { items: Array<{ id: string; public_key: string }> };
+              if (data.items.length > 0) {
+                const identity = data.items[0];
+                config.identityId = identity.id;
+                config.publicKey = identity.public_key;
+                saveConfig(config);
+
+                const restoreRes = await fetch(
+                  `${auth.apiBaseUrl}/v1/identities/${identity.id}/restore`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "content-type": "application/json",
+                      authorization: `Bearer ${session.token}`,
+                    },
+                    body: JSON.stringify({ public_key: identity.public_key }),
+                  }
+                );
+                if (restoreRes.ok) {
+                  console.error(`[auth-monitor] recovered identity ${identity.id}`);
+                } else {
+                  console.error(`[auth-monitor] identity recovery restore failed: ${await restoreRes.text()}`);
+                }
+              }
+            }
+          } catch (err) {
+            console.error(`[auth-monitor] identity recovery error: ${err}`);
           }
         }
 

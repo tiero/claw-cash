@@ -36,6 +36,10 @@ export interface CreateIdentityResponse {
   created_at: string;
 }
 
+export interface ListIdentitiesResponse {
+  items: CreateIdentityResponse[];
+}
+
 export interface InputDigest {
   inputIndex: number;
   digest: Uint8Array;

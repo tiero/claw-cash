@@ -94,7 +94,7 @@ export async function handleLogin(argv?: Record<string, unknown>): Promise<never
       config.sessionToken = session.token;
       saveConfig(config);
 
-      // If identity exists in config, restore it on the API
+      // Restore or recover identity
       if (config.identityId && config.publicKey) {
         const restoreRes = await fetch(
           `${config.apiBaseUrl}/v1/identities/${config.identityId}/restore`,
@@ -110,6 +110,41 @@ export async function handleLogin(argv?: Record<string, unknown>): Promise<never
         if (!restoreRes.ok) {
           const text = await restoreRes.text();
           console.error(`Warning: identity restore failed: ${text}`);
+        }
+      } else {
+        // Config wiped — try to recover existing identity from server
+        try {
+          const listRes = await fetch(`${config.apiBaseUrl}/v1/identities`, {
+            headers: { authorization: `Bearer ${session.token}` },
+          });
+          if (listRes.ok) {
+            const data = (await listRes.json()) as { items: Array<{ id: string; public_key: string }> };
+            if (data.items.length > 0) {
+              const identity = data.items[0];
+              config.identityId = identity.id;
+              config.publicKey = identity.public_key;
+              saveConfig(config);
+
+              const restoreRes = await fetch(
+                `${config.apiBaseUrl}/v1/identities/${identity.id}/restore`,
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type": "application/json",
+                    authorization: `Bearer ${session.token}`,
+                  },
+                  body: JSON.stringify({ public_key: identity.public_key }),
+                }
+              );
+              if (restoreRes.ok) {
+                console.error(`Recovered existing identity: ${identity.id}`);
+              } else {
+                console.error(`Warning: identity recovery restore failed: ${await restoreRes.text()}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Warning: identity recovery failed: ${err instanceof Error ? err.message : err}`);
         }
       }
 

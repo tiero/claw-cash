@@ -1261,13 +1261,13 @@
       <div class="roadmap-grid">
         <div class="roadmap-card">
           <div class="roadmap-tag now">NOW</div>
-          <h3>x402 Client Support</h3>
-          <p>Detect <code>402 Payment Required</code>, parse payment requirements, auto-swap BTC to stablecoins, retry with proof of payment. Agents pay for APIs without thinking about it.</p>
-        </div>
-        <div class="roadmap-card">
-          <div class="roadmap-tag now">NOW</div>
           <h3>MCP Server</h3>
           <p>Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>x402 Client Support</h3>
+          <p><code>cash pay &lt;url&gt;</code> command. Detect <code>402 Payment Required</code>, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>).</p>
         </div>
         <div class="roadmap-card">
           <div class="roadmap-tag next">NEXT</div>
@@ -1307,7 +1307,7 @@
         <details class="faq-item">
           <summary>How does x402 payment work?</summary>
           <div class="faq-answer">
-            When an agent hits an API that returns <code>402 Payment Required</code>, Claw Cash reads the payment requirements (amount, token, chain, address), swaps BTC to the requested stablecoin on the fly via atomic swap, sends the payment, and retries the original request. The agent holds sats as its treasury and pays in whatever currency the API demands.
+            When an agent hits an API that returns <code>402 Payment Required</code>, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in <a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>.
           </div>
         </details>
         <details class="faq-item">

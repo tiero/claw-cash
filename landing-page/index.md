@@ -112,7 +112,6 @@ The goal: the Privy of agents. Plug any auth provider, same enclave-backed ident
 
 ## Links
 
-- [GitHub](https://github.com/ArkLabsHQ/clw-cash)
-- [Documentation](https://docs.clw.cash)
-- [Telegram Community](https://t.me/ArkCommunity)
-- Built by [Ark Labs](https://arklabs.to)
+- Built by [tiero](https://github.com/tiero)
+- Powered by [Arkade](https://arkadeos.com)
+- [Telegram](https://t.me/arkade_os)

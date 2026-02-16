@@ -5,11 +5,7 @@
 ## Get Started
 
 ```bash
-npm install -g clw-cash
-cash init
-
-# Start the background daemon (monitors swaps, auto-claims)
-cash start
+npx clw-cash init
 ```
 
 ## Commands

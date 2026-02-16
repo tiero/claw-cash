@@ -7,11 +7,28 @@ Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = 
 ## Agent Rules
 
 - **Run commands directly.** No narration before or after. Just run the command and return the result.
-- **Never poll or retry.** Commands exit on their own. If a command fails, report the error — don't retry.
+- **Don't retry on failure.** If a command fails, report the error — don't retry without asking.
 - **Ask before sending.** Always confirm with the user before running `cash send`. Balance checks and receives are safe.
 - **One command at a time.** Don't chain or batch. Run, read output, decide next step.
-- **Timeouts:** 30s default, 120s for `cash init`.
+- **Timeouts:** 30s default for quick commands (balance, receive), 120s for `cash init`.
 - **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
+
+### Reactive Polling
+
+For long-running operations (swaps, pending receives), keep the user informed:
+
+- **Run in background with short yield** — don't block the conversation for >15s without an update. Use `yieldMs=5000` or `background=true` for swap commands.
+- **Stream progress** — relay status lines as they appear:
+  - "Executing swap BTC → USDC..."
+  - "Waiting for on-chain confirmation..."
+  - "Swap claimed! New balance: X sats"
+- **Poll with `process action=log`** — if a command is backgrounded, check its output periodically and report the latest status line to the user.
+- **Timeout strategy:**
+  - Quick commands (balance, receive, config): 30s
+  - Swaps/settlements: start with `yieldMs=10000`, then poll process log
+  - If still running after 60s, tell user "still processing, I'll let you know when done"
+- **Never go silent** for >15s during a long operation. Always provide a status update.
+- **Never let a timeout kill a command silently** — if a command times out, tell the user what happened and suggest next steps (e.g., `cash swap <id>` to check status).
 
 ## Setup
 
@@ -60,13 +77,13 @@ CLW_DAEMON_PORT=3457          # default: 3457
 
 ```bash
 # Send sats via Ark (instant, off-chain)
-cash send --amount 100000 --currency btc --where arkade --to <ark-address>
+cash send --amount 100000 --currency sats --where arkade --to <ark-address>
 
 # Send sats on-chain
-cash send --amount 100000 --currency btc --where onchain --to <bitcoin-address>
+cash send --amount 100000 --currency sats --where onchain --to <bitcoin-address>
 
 # Pay a Lightning invoice
-cash send --amount 50000 --currency btc --where lightning --to <bolt11-invoice>
+cash send --amount 50000 --currency sats --where lightning --to <bolt11-invoice>
 
 # Auto-detect invoice format (bolt11 or BIP21, positional arg)
 cash send lnbc500n1pj...
@@ -87,15 +104,15 @@ cash send --amount 50 --currency usdc --where arbitrum --to <0x-address>
 
 ```bash
 # Get an Ark address
-cash receive --amount 100000 --currency btc --where arkade
+cash receive --amount 100000 --currency sats --where arkade
 # -> {"ok": true, "data": {"address": "ark1q...", "type": "ark", "amount": 100000}}
 
 # Create a Lightning invoice
-cash receive --amount 50000 --currency btc --where lightning
+cash receive --amount 50000 --currency sats --where lightning
 # -> {"ok": true, "data": {"bolt11": "lnbc...", "paymentHash": "...", "amount": 50000}}
 
 # Get a boarding (on-chain) address
-cash receive --amount 100000 --currency btc --where onchain
+cash receive --amount 100000 --currency sats --where onchain
 # -> {"ok": true, "data": {"address": "bc1q...", "type": "onchain", "amount": 100000}}
 ```
 
@@ -198,6 +215,45 @@ cash stop
 # (if not running: {"ok": true, "data": {"stopped": false, "reason": "not_running"}})
 ```
 
+### Swap Event Webhooks
+
+Register a webhook URL to receive notifications when the daemon claims, refunds, or fails a swap. Webhooks are in-memory (re-register after daemon restart).
+
+```bash
+# Register for swap event notifications (daemon HTTP API, default port 3457)
+curl -X POST http://127.0.0.1:3457/notify/register \
+  -H 'content-type: application/json' \
+  -d '{"url": "https://my-bot/webhook", "events": ["swap.claimed", "swap.refunded", "swap.failed"]}'
+# -> {"id": "<uuid>", "url": "https://my-bot/webhook", "events": ["swap.claimed", "swap.refunded", "swap.failed"]}
+
+# List active webhooks
+curl http://127.0.0.1:3457/notify
+# -> {"webhooks": [{"id": "...", "url": "...", "events": [...]}]}
+
+# Unregister a webhook
+curl -X DELETE http://127.0.0.1:3457/notify/<id>
+# -> {"removed": true}
+```
+
+Webhook payload (POST to registered URL):
+
+```json
+{
+  "event": "swap.claimed",
+  "swapId": "abc123...",
+  "status": "completed",
+  "direction": "btc_to_stablecoin",
+  "sourceAmount": 100000,
+  "sourceToken": "btc_arkade",
+  "targetAmount": 10.5,
+  "targetToken": "usdc_pol",
+  "message": "Swap abc123... claimed successfully",
+  "timestamp": "2026-02-16T12:00:00Z"
+}
+```
+
+Events: `swap.claimed`, `swap.refunded`, `swap.failed`.
+
 ## Output Format
 
 Success (stdout):
@@ -214,11 +270,12 @@ Error (stderr):
 
 ## Currency & Network Matrix
 
-| Currency   | Networks                    | Notes                          |
-| ---------- | --------------------------- | ------------------------------ |
-| btc / sats | onchain, lightning, arkade  | Both accept amounts in satoshis |
-| usdt       | polygon, ethereum, arbitrum |                                |
-| usdc       | polygon, ethereum, arbitrum |                                |
+| Currency | Networks                    | Notes                                     |
+| -------- | --------------------------- | ----------------------------------------- |
+| sats     | onchain, lightning, arkade  | Amount in satoshis (use `sats` not `btc`) |
+| btc      | onchain, lightning, arkade  | Amount in BTC (e.g. 0.001)                |
+| usdt     | polygon, ethereum, arbitrum |                                           |
+| usdc     | polygon, ethereum, arbitrum |                                           |
 
 ## Swap Status Lifecycle
 
@@ -261,10 +318,10 @@ cash status | jq .data.session
 cash swaps --pending | jq '[.data.lendaswap.pending[].id]'
 
 # Get the payment bolt11 invoice
-cash receive --amount 50000 --currency btc --where lightning | jq -r .data.bolt11
+cash receive --amount 50000 --currency sats --where lightning | jq -r .data.bolt11
 
 # Get the ark address for receiving
-cash receive --amount 100000 --currency btc --where arkade | jq -r .data.address
+cash receive --amount 100000 --currency sats --where arkade | jq -r .data.address
 
 # Get the payment URL for stablecoin receive
 cash receive --amount 10 --currency usdc | jq -r .data.paymentUrl

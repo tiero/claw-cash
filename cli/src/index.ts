@@ -27,6 +27,7 @@ Usage:
   cash balance
   cash init --api-url <url> --token <jwt> --ark-server <url>
   cash login                  Re-authenticate via Telegram (refresh token)
+  cash skill                  Print SKILL.md (agent instructions)
   cash config                 Show resolved configuration and sources
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
@@ -52,7 +53,7 @@ Examples:
   cash send --amount 100000 --currency sats --where arkade --to ark1q...
   cash send --amount 50000 --currency sats --where lightning --to lnbc1...
   cash send lnbc500n1...
-  cash receive --amount 100000 --currency btc --where lightning
+  cash receive --amount 100000 --currency sats --where lightning
   cash receive --amount 10 --currency usdt --where polygon --address 0x...
   cash balance
   cash start
@@ -108,6 +109,15 @@ async function main() {
       case "login":
         await handleLogin(argv);
         return;
+      case "skill": {
+        const { readFileSync } = await import("node:fs");
+        const { join, dirname } = await import("node:path");
+        const { fileURLToPath } = await import("node:url");
+        const __dirname = dirname(fileURLToPath(import.meta.url));
+        const skillPath = join(__dirname, "..", "SKILL.md");
+        process.stdout.write(readFileSync(skillPath, "utf-8"));
+        return;
+      }
       case "config":
         await handleConfig();
         return;
@@ -273,9 +283,11 @@ async function runDaemon() {
   console.error(`[daemon] starting on port ${port}...`);
 
   const ctx = await createContext(config, { enableSwapManager: true });
-  const monitor = new SwapMonitor(ctx);
+  const { WebhookRegistry } = await import("./notifier.js");
+  const webhookRegistry = new WebhookRegistry();
+  const monitor = new SwapMonitor(ctx, { onEvent: (e) => webhookRegistry.dispatch(e) });
   const authMonitor = new AuthMonitor();
-  const server = createDaemonServer({ port, ctx, monitor, authMonitor });
+  const server = createDaemonServer({ port, ctx, monitor, authMonitor, webhookRegistry });
 
   // Start Lightning SwapManager
   await ctx.lightning.startSwapManager();

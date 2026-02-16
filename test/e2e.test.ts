@@ -20,7 +20,8 @@ const env = {
   INTERNAL_API_KEY,
   TICKET_SIGNING_SECRET: TICKET_SECRET,
   SESSION_SIGNING_SECRET: SESSION_SECRET,
-  // No TELEGRAM_BOT_TOKEN — enables test mode (auto-resolve challenges)
+  // No TELEGRAM_BOT_TOKEN + ALLOW_TEST_AUTH — enables test mode (auto-resolve challenges)
+  ALLOW_TEST_AUTH: "true",
   BACKUP_FILE_PATH: `/tmp/clw-e2e-backups-${Date.now()}.json`,
 };
 
@@ -50,7 +51,7 @@ function spawnEnclave(): ChildProcess {
   const tsx = resolve(ROOT, "enclave/node_modules/.bin/tsx");
   const proc = spawn(tsx, [resolve(ROOT, "enclave/src/index.ts")], {
     cwd: ROOT,
-    env: { ...env, ENCLAVE_PORT: String(ENCLAVE_PORT) },
+    env: { ...env, ENCLAVE_PORT: String(ENCLAVE_PORT), ENCLAVE_DEV_MODE: "true" },
     stdio: ["ignore", "pipe", "pipe"],
   });
   proc.stdout?.on("data", (d: Buffer) =>
@@ -76,6 +77,7 @@ function spawnApi(): ChildProcess {
       "--var", "TELEGRAM_BOT_TOKEN:",
       "--var", "TELEGRAM_BOT_USERNAME:",
       "--var", "EV_API_KEY:",
+      "--var", "ALLOW_TEST_AUTH:true",
       "--show-interactive-dev-session", "false",
     ],
     {

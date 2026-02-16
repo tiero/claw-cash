@@ -1,4 +1,4 @@
-# 🦞 Claw Cash — Human-to-Agent Payments
+# Claw Cash — Human-to-Agent Payments
 
 > Stablecoins in. Bitcoin out. Money agents can trust, and verify.
 
@@ -31,7 +31,7 @@ Shows BTC (onchain, lightning, arkade) and stablecoin balances.
 ### Send BTC to another agent via Ark
 
 ```bash
-cash send --amount 50000 --currency btc --where arkade --to ark1q...
+cash send --amount 50000 --currency sats --where arkade --to ark1q...
 ```
 
 Amount is in satoshis. Instant settlement, minimal fees.
@@ -177,7 +177,7 @@ More at [clw.cash/faq](https://clw.cash/faq)
 
 ## Links
 
-- [Agent Skill (SKILL.md)](https://clw.cash/SKILL.md) — full command reference for LLM agents
+- [Agent Skill (SKILL.md)](https://unpkg.com/clw-cash/SKILL.md) — full command reference for LLM agents
 - Built by [tiero](https://github.com/tiero)
 - Powered by [Arkade](https://arkadeos.com)
 - [Telegram](https://t.me/arkade_os)

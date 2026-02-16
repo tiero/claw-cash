@@ -60,6 +60,58 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
   return config;
 }
 
+export type ConfigSource = "env" | "file" | "default";
+
+export interface ConfigEntry {
+  value: string;
+  source: ConfigSource;
+}
+
+export type CashConfigWithSources = Record<keyof CashConfig, ConfigEntry>;
+
+const ENV_KEYS: Record<keyof CashConfig, string> = {
+  apiBaseUrl: "CLW_API_URL",
+  sessionToken: "CLW_SESSION_TOKEN",
+  identityId: "CLW_IDENTITY_ID",
+  publicKey: "CLW_PUBLIC_KEY",
+  arkServerUrl: "CLW_ARK_SERVER_URL",
+  network: "CLW_NETWORK",
+};
+
+const DEFAULTS: Record<keyof CashConfig, string> = {
+  apiBaseUrl: "https://api.clw.cash",
+  sessionToken: "",
+  identityId: "",
+  publicKey: "",
+  arkServerUrl: "https://arkade.computer",
+  network: "bitcoin",
+};
+
+export function loadConfigWithSources(): CashConfigWithSources {
+  let fileConfig: Partial<CashConfig> = {};
+
+  try {
+    const raw = readFileSync(CONFIG_FILE, "utf-8");
+    fileConfig = JSON.parse(raw) as Partial<CashConfig>;
+  } catch {
+    // No config file
+  }
+
+  const result = {} as CashConfigWithSources;
+  for (const key of Object.keys(ENV_KEYS) as (keyof CashConfig)[]) {
+    const envVal = process.env[ENV_KEYS[key]];
+    if (envVal !== undefined) {
+      result[key] = { value: envVal, source: "env" };
+    } else if (fileConfig[key]) {
+      result[key] = { value: fileConfig[key], source: "file" };
+    } else {
+      result[key] = { value: DEFAULTS[key], source: "default" };
+    }
+  }
+
+  return result;
+}
+
 export function saveConfig(config: CashConfig): void {
   mkdirSync(CONFIG_DIR, { recursive: true, mode: 0o700 });
   writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), { mode: 0o600 });

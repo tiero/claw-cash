@@ -14,6 +14,7 @@ import { handleClaim } from "./commands/claim.js";
 import { handleRefund } from "./commands/refund.js";
 import { handleLogin } from "./commands/login.js";
 import { handleSwap } from "./commands/swap.js";
+import { handleConfig } from "./commands/config.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -25,6 +26,7 @@ Usage:
   cash balance
   cash init --api-url <url> --token <jwt> --ark-server <url>
   cash login                  Re-authenticate via Telegram (refresh token)
+  cash config                 Show resolved configuration and sources
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
   cash status                 Show daemon status
@@ -96,6 +98,9 @@ async function main() {
         return;
       case "login":
         await handleLogin();
+        return;
+      case "config":
+        await handleConfig();
         return;
       case "start":
         await handleStart();

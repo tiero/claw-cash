@@ -208,7 +208,7 @@ npx wrangler d1 execute clw-cash-db --env production --remote --file=migration.s
 
 ## TODO Before Production
 
-- [ ] Replace plaintext sealed_key backup with encrypted backup
+- [x] Replace plaintext sealed_key backup with encrypted backup (done — uses Evervault encryption / AES-256-GCM fallback)
 - [ ] Add SIEM export for audit events (Cloudflare Logpush)
 - [ ] Set up monitoring alerts (Workers Analytics + PagerDuty/Sentry)
 - [ ] Enforce attestation verification policy in callers

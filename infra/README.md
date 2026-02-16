@@ -27,7 +27,8 @@
 - For production, invoke the enclave with an Evervault SDK attestable enclave session from the caller side (client or API caller depending on trust model).
 - Pin expected PCR/attestation policy in your verification step.
 
-## 5) MVP backup mode
+## 5) Backup mode
 
-- Current MVP stores plaintext private key backup outside enclave memory through `/internal/backup/export`.
-- Treat this as temporary. Replace with encrypted backup (e.g., Evervault Encryption / KMS envelope) before production.
+- Key backups are sealed (encrypted) before leaving enclave memory via `/internal/backup/export`.
+- In production, encryption uses Evervault's internal API (port 9999, enclave-only). In local dev, falls back to AES-256-GCM with a configured `SEALING_KEY`.
+- The API stores only opaque ciphertext in D1 — it cannot decrypt the keys.

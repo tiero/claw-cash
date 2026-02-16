@@ -1,6 +1,6 @@
 {
   "name": "clw-cash",
-  "version": "0.1.13",
+  "version": "0.1.14",
   "description": "Bitcoin & Stablecoin agent wallet CLI. Keys held in a secure enclave.",
   "type": "module",
   "bin": {
@@ -13,6 +13,7 @@
   ],
   "scripts": {
     "build": "tsup",
+    "prepublishOnly": "tsup",
     "typecheck": "tsc --noEmit",
     "dev": "tsx src/index.ts"
   },

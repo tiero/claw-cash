@@ -7,11 +7,28 @@ Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = 
 ## Agent Rules
 
 - **Run commands directly.** No narration before or after. Just run the command and return the result.
-- **Never poll or retry.** Commands exit on their own. If a command fails, report the error — don't retry.
+- **Don't retry on failure.** If a command fails, report the error — don't retry without asking.
 - **Ask before sending.** Always confirm with the user before running `cash send`. Balance checks and receives are safe.
 - **One command at a time.** Don't chain or batch. Run, read output, decide next step.
-- **Timeouts:** 30s default, 120s for `cash init`.
+- **Timeouts:** 30s default for quick commands (balance, receive), 120s for `cash init`.
 - **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
+
+### Reactive Polling
+
+For long-running operations (swaps, pending receives), keep the user informed:
+
+- **Run in background with short yield** — don't block the conversation for >15s without an update. Use `yieldMs=5000` or `background=true` for swap commands.
+- **Stream progress** — relay status lines as they appear:
+  - "Executing swap BTC → USDC..."
+  - "Waiting for on-chain confirmation..."
+  - "Swap claimed! New balance: X sats"
+- **Poll with `process action=log`** — if a command is backgrounded, check its output periodically and report the latest status line to the user.
+- **Timeout strategy:**
+  - Quick commands (balance, receive, config): 30s
+  - Swaps/settlements: start with `yieldMs=10000`, then poll process log
+  - If still running after 60s, tell user "still processing, I'll let you know when done"
+- **Never go silent** for >15s during a long operation. Always provide a status update.
+- **Never let a timeout kill a command silently** — if a command times out, tell the user what happened and suggest next steps (e.g., `cash swap <id>` to check status).
 
 ## Setup
 

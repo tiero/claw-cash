@@ -371,6 +371,132 @@
     .code-body .flag { color: #888; }
     .code-body .value { color: #7ec699; }
 
+    /* Security & Auth */
+    .auth-intro {
+      text-align: center;
+      max-width: 600px;
+      margin: 0 auto 64px;
+    }
+
+    .auth-intro h2 {
+      margin-bottom: 24px;
+    }
+
+    .auth-pillars {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-bottom: 64px;
+    }
+
+    @media (max-width: 600px) {
+      .auth-pillars {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .pillar {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    .pillar h3 {
+      font-size: 18px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pillar h3 span {
+      font-size: 22px;
+    }
+
+    .pillar .pillar-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--orange);
+      margin-bottom: 12px;
+    }
+
+    .pillar p {
+      color: var(--gray);
+      font-size: 15px;
+    }
+
+    .auth-methods-label {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--gray);
+      text-align: center;
+      margin-bottom: 24px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+    }
+
+    .auth-row {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .auth-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--code-bg);
+      border: 1px solid #333;
+      padding: 10px 20px;
+      border-radius: 100px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--light);
+      transition: border-color 0.2s;
+    }
+
+    .auth-chip.live {
+      border-color: var(--orange);
+    }
+
+    .auth-chip.soon {
+      opacity: 0.45;
+    }
+
+    .auth-chip .chip-icon {
+      font-size: 18px;
+      line-height: 1;
+    }
+
+    .auth-chip .chip-badge {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      background: #1a2a1a;
+      color: #4ade80;
+      padding: 2px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+    }
+
+    .auth-chip.soon .chip-badge {
+      background: #1a1a2a;
+      color: #888;
+    }
+
+    .auth-vision {
+      text-align: center;
+      margin-top: 32px;
+      font-size: 15px;
+      color: var(--gray);
+    }
+
+    .auth-vision strong {
+      color: var(--light);
+    }
+
     /* Payment Links */
     .payment-grid {
       display: flex;
@@ -406,11 +532,148 @@
       white-space: nowrap;
     }
 
-    .payment-preview iframe {
+    /* Static pay mockup */
+    .pay-mockup {
+      background: #f5f5f5;
+      padding: 32px 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .pay-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 24px rgba(0,0,0,0.06);
       width: 100%;
-      height: 600px;
+      max-width: 370px;
+      color: #111;
+    }
+
+    .pay-brand {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 32px;
+    }
+
+    .pay-brand-name {
+      font-size: 15px;
+      font-weight: 700;
+      color: #111;
+    }
+
+    .pay-brand-sub {
+      font-size: 12px;
+      color: #aaa;
+      margin-top: 2px;
+    }
+
+    .pay-brand-sub em {
+      font-style: normal;
+      color: #666;
+    }
+
+    .pay-amount {
+      text-align: center;
+      margin-bottom: 28px;
+    }
+
+    .pay-amount-value {
+      font-size: 56px;
+      font-weight: 700;
+      color: #111;
+      letter-spacing: -3px;
+      line-height: 1;
+    }
+
+    .pay-amount-cur {
+      font-size: 24px;
+      font-weight: 600;
+      color: #aaa;
+      vertical-align: super;
+      margin-left: 4px;
+    }
+
+    .pay-amount-meta {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      margin-top: 10px;
+      font-size: 13px;
+      color: #666;
+    }
+
+    .pay-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      display: inline-block;
+    }
+
+    .pay-meta-sep { color: #e8e8e8; }
+
+    .pay-recipient {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 16px;
+      background: #fafafa;
+      border: 1px solid #e8e8e8;
+      border-radius: 8px;
+      margin-bottom: 24px;
+    }
+
+    .pay-recipient-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .pay-avatar {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #111;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+    }
+
+    .pay-recipient-label {
+      font-size: 11px;
+      color: #aaa;
+    }
+
+    .pay-recipient-addr {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .pay-btn-mock {
+      width: 100%;
+      padding: 14px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #fff;
+      background: #111;
       border: none;
-      background: #0a0a0a;
+      border-radius: 12px;
+      text-align: center;
+    }
+
+    .pay-footer-mock {
+      text-align: center;
+      padding: 20px 0 4px;
+      font-size: 12px;
+      color: #666;
+    }
+
+    .pay-footer-mock strong {
+      color: #111;
+      font-weight: 600;
     }
 
     .payment-label {
@@ -426,12 +689,6 @@
 
     .payment-preview {
       width: 100%;
-    }
-
-    @media (max-width: 768px) {
-      .payment-preview iframe {
-        height: 500px;
-      }
     }
 
     /* Use Cases */
@@ -664,6 +921,63 @@
     </div>
   </section>
 
+  <!-- Security & Auth -->
+  <section id="security">
+    <div class="container">
+      <div class="auth-intro">
+        <h2>Identity for Agents</h2>
+        <p class="section-lead" style="margin: 0 auto;">
+          Private keys live in a secure enclave. Agents authenticate with the method that fits their environment. One identity, any auth provider.
+        </p>
+      </div>
+
+      <div class="auth-pillars">
+        <div class="pillar">
+          <h3><span>🔐</span> Secure Enclave</h3>
+          <div class="pillar-tag">KEY CUSTODY</div>
+          <p>Private keys are generated and stored inside an Evervault Enclave. They never leave the enclave boundary. The CLI signs transactions by sending requests to the enclave over an attested TLS channel. Even if the host is compromised, keys remain sealed.</p>
+        </div>
+        <div class="pillar">
+          <h3><span>🎫</span> Challenge-Callback Auth</h3>
+          <div class="pillar-tag">AUTHENTICATION</div>
+          <p>Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a callback with a signed token. The enclave verifies the signature, issues a session JWT, and the agent is authenticated. No passwords, no API keys stored on disk.</p>
+        </div>
+      </div>
+
+      <div class="auth-methods-label">Auth methods</div>
+      <div class="auth-row">
+        <div class="auth-chip live">
+          <span class="chip-icon">✈</span> Telegram
+          <span class="chip-badge">LIVE</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">💬</span> Slack
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🔑</span> Google
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🗝</span> 1Password
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🛡</span> YubiKey
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🔏</span> Passkeys
+          <span class="chip-badge">SOON</span>
+        </div>
+      </div>
+
+      <p class="auth-vision">
+        <strong>The Privy of agents.</strong> Plug any auth provider. Same enclave-backed identity underneath.
+      </p>
+    </div>
+  </section>
+
   <!-- Payment Links -->
   <section id="payment-links">
     <div class="container">
@@ -677,7 +991,47 @@
             <div class="code-dots"><span></span><span></span><span></span></div>
             <div class="payment-preview-url">pay.clw.cash</div>
           </div>
-          <iframe src="https://pay.clw.cash/?id=24a8665a-6eb7-4bce-ada1-b9d4f3e66941" loading="lazy"></iframe>
+          <!-- Static mockup of pay.clw.cash -->
+          <div class="pay-mockup">
+            <div class="pay-card">
+              <div class="pay-brand">
+                <div>
+                  <div class="pay-brand-name">Cash for Claws</div>
+                  <div class="pay-brand-sub"><em>bots get bitcoins</em>, humans pay in stablecoins</div>
+                </div>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ddd" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+              </div>
+
+              <div class="pay-amount">
+                <div class="pay-amount-value">
+                  <svg width="36" height="36" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path d="M20.4 18.4c0-2.1-1.3-2.8-3.8-3.1-1.8-.3-2.2-.7-2.2-1.5s.7-1.3 1.8-1.3c1 0 1.6.4 1.9 1.2.1.1.2.2.3.2h1.1c.2 0 .3-.1.3-.3-.3-1.2-1.2-2.1-2.5-2.3v-1.5c0-.2-.1-.3-.3-.3h-1c-.2 0-.3.1-.3.3v1.4c-1.7.3-2.8 1.3-2.8 2.7 0 2 1.2 2.7 3.8 3.1 1.6.3 2.2.7 2.2 1.6 0 .9-.8 1.5-1.9 1.5-1.5 0-2-.6-2.2-1.5 0-.1-.2-.2-.3-.2h-1.2c-.2 0-.3.1-.3.3.3 1.5 1.2 2.3 2.9 2.6v1.5c0 .2.1.3.3.3h1c.2 0 .3-.1.3-.3v-1.5c1.8-.2 2.8-1.3 2.8-2.8z" fill="#fff"/><path d="M12.8 25.2c-4.6-1.6-7-6.6-5.3-11.1.8-2.3 2.7-4 5-4.8.2-.1.3-.2.3-.4v-1c0-.2-.1-.3-.3-.3-.1 0-.1 0-.2 0C7 9.3 3.6 14.8 5.3 20.1c1 3.1 3.5 5.5 6.6 6.5.2.1.4 0 .4-.2v-1c.1-.1 0-.2-.1-.3l-.1.1h-.3zm6.6-17.5c-.2-.1-.4 0-.4.2v1c0 .2.1.3.3.4 4.6 1.6 7 6.6 5.3 11.1-.8 2.3-2.7 4-5 4.8-.2.1-.3.2-.3.4v1c0 .2.1.3.3.3.1 0 .1 0 .2 0 5.3-1.7 8.2-7.3 6.5-12.6-1-3.1-3.5-5.5-6.6-6.5h-.3z" fill="#fff"/></svg>
+                  1<span class="pay-amount-cur">USDC</span>
+                </div>
+                <div class="pay-amount-meta">
+                  <svg width="16" height="16" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="16" fill="#2775CA"/><path d="M20.4 18.4c0-2.1-1.3-2.8-3.8-3.1-1.8-.3-2.2-.7-2.2-1.5s.7-1.3 1.8-1.3c1 0 1.6.4 1.9 1.2.1.1.2.2.3.2h1.1c.2 0 .3-.1.3-.3-.3-1.2-1.2-2.1-2.5-2.3v-1.5c0-.2-.1-.3-.3-.3h-1c-.2 0-.3.1-.3.3v1.4c-1.7.3-2.8 1.3-2.8 2.7 0 2 1.2 2.7 3.8 3.1 1.6.3 2.2.7 2.2 1.6 0 .9-.8 1.5-1.9 1.5-1.5 0-2-.6-2.2-1.5 0-.1-.2-.2-.3-.2h-1.2c-.2 0-.3.1-.3.3.3 1.5 1.2 2.3 2.9 2.6v1.5c0 .2.1.3.3.3h1c.2 0 .3-.1.3-.3v-1.5c1.8-.2 2.8-1.3 2.8-2.8z" fill="#fff"/></svg>
+                  USDC
+                  <span class="pay-meta-sep">&middot;</span>
+                  <span class="pay-dot" style="background:#8247e5"></span>
+                  Polygon
+                </div>
+              </div>
+
+              <div class="pay-recipient">
+                <div class="pay-recipient-left">
+                  <div class="pay-avatar">🤖</div>
+                  <div>
+                    <div class="pay-recipient-label">To</div>
+                    <div class="pay-recipient-addr">ark1qq...d901</div>
+                  </div>
+                </div>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#aaa" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              </div>
+
+              <div class="pay-btn-mock">Connect Wallet &amp; Pay</div>
+            </div>
+
+            <div class="pay-footer-mock">powered by <strong>Arkade</strong></div>
+          </div>
           <div class="payment-label"><strong>Pay request</strong> — human connects wallet and sends stablecoins</div>
         </div>
       </div>

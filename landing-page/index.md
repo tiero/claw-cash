@@ -78,6 +78,31 @@ clw-cash send --amount 10 --currency usdc --where polygon --to 0x...
 | `usdt`   | `polygon`, `arbitrum`, `ethereum`| token units |
 | `usdc`   | `polygon`, `arbitrum`, `ethereum`| token units |
 
+## Identity for Agents
+
+Private keys live in a secure enclave. Agents authenticate with the method that fits their environment. One identity, any auth provider.
+
+### Secure Enclave (Key Custody)
+
+Private keys are generated and stored inside an Evervault Enclave. They never leave the enclave boundary. The CLI signs transactions by sending requests to the enclave over an attested TLS channel. Even if the host is compromised, keys remain sealed.
+
+### Challenge-Callback Auth
+
+Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a callback with a signed token. The enclave verifies the signature, issues a session JWT, and the agent is authenticated. No passwords, no API keys stored on disk.
+
+### Auth Methods
+
+| Provider   | Status |
+|------------|--------|
+| Telegram   | Live   |
+| Slack      | Soon   |
+| Google     | Soon   |
+| 1Password  | Soon   |
+| YubiKey    | Soon   |
+| Passkeys   | Soon   |
+
+The goal: the Privy of agents. Plug any auth provider, same enclave-backed identity underneath.
+
 ## Why Bitcoin for Agents?
 
 - **Fixed supply**: 21 million coins — a consensus rule, not a policy decision

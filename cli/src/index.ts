@@ -15,6 +15,7 @@ import { handleRefund } from "./commands/refund.js";
 import { handleLogin } from "./commands/login.js";
 import { handleSwap } from "./commands/swap.js";
 import { handleConfig } from "./commands/config.js";
+import { handleFetch } from "./commands/fetch.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -37,6 +38,10 @@ Usage:
   cash claim <swapId>           Manually claim a swap (reveal preimage)
   cash refund <swapId>          Manually refund a swap
     --address <destination>     Refund destination (optional)
+  cash fetch <url>              Fetch URL with x402 payment support
+    --method <GET|POST>         HTTP method (default: GET)
+    --body <json>               Request body (for POST)
+    --header <key:value>        Custom header (repeatable)
 
 Currency: btc | sats | usdt | usdc
           btc = amount in BTC (e.g. 0.001), sats = amount in satoshis (e.g. 100000)
@@ -68,6 +73,7 @@ const argv = minimist(process.argv.slice(2), {
     "amount", "currency", "where", "to", "address", "id",
     "api-url", "token", "ark-server", "network", "port",
     "bot-token", "chat-id", "message-id",
+    "method", "body", "header",
   ],
   boolean: ["help", "version", "daemon-internal", "start"],
   alias: { h: "help", v: "version" },
@@ -155,6 +161,9 @@ async function main() {
         break;
       case "refund":
         await handleRefund(ctx, argv);
+        break;
+      case "fetch":
+        await handleFetch(ctx, argv);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

@@ -20,19 +20,22 @@ export const createIdentitySchema = z.object({
 
 export const signIntentSchema = z.object({
   digest: z.string().regex(digestPattern),
-  scope: z.literal("sign").optional()
+  scope: z.literal("sign").optional(),
+  signature_type: z.enum(["schnorr", "ecdsa"]).default("schnorr")
 });
 
 export const signSchema = z.object({
   digest: z.string().regex(digestPattern),
-  ticket: z.string().min(32).max(4096)
+  ticket: z.string().min(32).max(4096),
+  signature_type: z.enum(["schnorr", "ecdsa"]).default("schnorr")
 });
 
 export const signBatchSchema = z.object({
   digests: z.array(
     z.object({
       digest: z.string().regex(digestPattern),
-      scope: z.literal("sign").optional()
+      scope: z.literal("sign").optional(),
+      signature_type: z.enum(["schnorr", "ecdsa"]).default("schnorr")
     })
   ).min(1).max(100)
 });

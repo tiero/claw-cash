@@ -4,7 +4,8 @@ import type { Identity, SignerSession } from "@arkade-os/sdk";
 import { ClwApiClient } from "./apiClient.js";
 import { ReadonlyRemoteIdentity } from "./readonlyRemoteIdentity.js";
 import { extractDigests, injectSignatures } from "./signingUtils.js";
-import type { RemoteSignerConfig } from "./types.js";
+import { compressedPubKeyToEvmAddress } from "./evm.js";
+import type { EcdsaSignResponse, RemoteSignerConfig } from "./types.js";
 
 // Dynamic import to avoid hard dependency on internal SDK module
 let _TreeSignerSession: { random(): SignerSession } | null = null;
@@ -98,18 +99,42 @@ export class RemoteSignerIdentity implements Identity {
 
   /**
    * Sign a raw message by delegating to the remote API.
-   * Only "schnorr" is supported; "ecdsa" will throw.
+   * For "schnorr": returns 64-byte Schnorr signature.
+   * For "ecdsa": returns 65-byte r||s||v signature.
    */
   async signMessage(
     message: Uint8Array,
     signatureType: "schnorr" | "ecdsa"
   ): Promise<Uint8Array> {
-    if (signatureType === "ecdsa") {
-      throw new Error("ECDSA signing is not supported by RemoteSignerIdentity");
-    }
     const digestHex = hexEncode(message);
+    if (signatureType === "ecdsa") {
+      const result = await this.apiClient.signDigestEcdsa(digestHex);
+      // Return 65 bytes: r (32) || s (32) || v (1)
+      const r = hexDecode(result.r);
+      const s = hexDecode(result.s);
+      const sig = new Uint8Array(65);
+      sig.set(r, 0);
+      sig.set(s, 32);
+      sig[64] = result.v;
+      return sig;
+    }
     const sigHex = await this.apiClient.signDigest(digestHex);
     return hexDecode(sigHex);
+  }
+
+  /**
+   * Sign a digest with ECDSA via the remote API.
+   * Returns { r, s, v } suitable for EVM transaction signing.
+   */
+  async signEcdsaDigest(digestHex: string): Promise<EcdsaSignResponse> {
+    return this.apiClient.signDigestEcdsa(digestHex);
+  }
+
+  /**
+   * Derive the EVM address from this identity's compressed public key.
+   */
+  getEvmAddress(): string {
+    return compressedPubKeyToEvmAddress(hexEncode(this.pubKeyBytes));
   }
 
   /**

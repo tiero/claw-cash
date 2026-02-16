@@ -62,4 +62,5 @@ export interface TicketClaims {
   digest_hash: string;
   scope: "sign";
   nonce: string;
+  signature_type?: "schnorr" | "ecdsa";
 }

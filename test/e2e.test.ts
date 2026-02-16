@@ -521,6 +521,161 @@ describe("Identity listing and recovery", () => {
   });
 });
 
+describe("ECDSA signing", () => {
+  let sessionToken: string;
+  let identityId: string;
+  let publicKey: string;
+
+  it("setup: authenticate and create identity", async () => {
+    const challenge = await post("/v1/auth/challenge", {
+      telegram_user_id: "ecdsa_test_user_" + Date.now(),
+    });
+    const { json } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
+    });
+    sessionToken = json.token;
+
+    const created = await post("/v1/identities", { alg: "secp256k1" }, sessionToken);
+    expect(created.status).toBe(201);
+    identityId = created.json.id;
+    publicKey = created.json.public_key;
+  });
+
+  it("sign-intent with signature_type=ecdsa returns ticket", async () => {
+    const digest = randomBytes(32).toString("hex");
+    const { status, json } = await post(
+      `/v1/identities/${identityId}/sign-intent`,
+      { digest, scope: "sign", signature_type: "ecdsa" },
+      sessionToken
+    );
+    expect(status).toBe(201);
+    expect(json.ticket).toBeDefined();
+    expect(json.signature_type).toBe("ecdsa");
+  });
+
+  it("sign with signature_type=ecdsa returns r, s, v", async () => {
+    const digest = randomBytes(32).toString("hex");
+    const intent = await post(
+      `/v1/identities/${identityId}/sign-intent`,
+      { digest, scope: "sign", signature_type: "ecdsa" },
+      sessionToken
+    );
+    expect(intent.status).toBe(201);
+
+    const { status, json } = await post(
+      `/v1/identities/${identityId}/sign`,
+      { digest, ticket: intent.json.ticket, signature_type: "ecdsa" },
+      sessionToken
+    );
+    expect(status).toBe(200);
+    expect(json.signature).toBeDefined();
+    expect(json.r).toBeDefined();
+    expect(json.s).toBeDefined();
+    expect(json.v).toBeDefined();
+    // r and s should be 64 hex chars (32 bytes)
+    expect(json.r.length).toBe(64);
+    expect(json.s.length).toBe(64);
+    // v should be 27 or 28 (Ethereum convention)
+    expect([27, 28]).toContain(json.v);
+    // signature should be 130 hex chars (65 bytes: r + s + recovery)
+    expect(json.signature.length).toBe(130);
+  });
+
+  it("sign with default signature_type still returns Schnorr (backward compat)", async () => {
+    const digest = randomBytes(32).toString("hex");
+    const intent = await post(
+      `/v1/identities/${identityId}/sign-intent`,
+      { digest, scope: "sign" },
+      sessionToken
+    );
+    expect(intent.status).toBe(201);
+
+    const { status, json } = await post(
+      `/v1/identities/${identityId}/sign`,
+      { digest, ticket: intent.json.ticket },
+      sessionToken
+    );
+    expect(status).toBe(200);
+    expect(json.signature).toBeDefined();
+    // Schnorr signature is 128 hex chars (64 bytes)
+    expect(json.signature.length).toBe(128);
+    // Should NOT have r, s, v
+    expect(json.r).toBeUndefined();
+    expect(json.s).toBeUndefined();
+    expect(json.v).toBeUndefined();
+  });
+
+  it("ECDSA signature recovers to correct public key", async () => {
+    // Use enclave's copy of @noble/secp256k1 since it's not a root dependency
+    const secp = await import("../enclave/node_modules/@noble/secp256k1/index.js") as any;
+    const { createHmac, createHash } = await import("node:crypto");
+
+    // Configure hashes for recovery
+    secp.hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]) => {
+      const hmac = createHmac("sha256", key);
+      for (const msg of msgs) hmac.update(msg);
+      return new Uint8Array(hmac.digest());
+    };
+    secp.hashes.sha256 = (...msgs: Uint8Array[]) => {
+      const h = createHash("sha256");
+      for (const msg of msgs) h.update(msg);
+      return new Uint8Array(h.digest());
+    };
+
+    const digest = randomBytes(32).toString("hex");
+    const intent = await post(
+      `/v1/identities/${identityId}/sign-intent`,
+      { digest, scope: "sign", signature_type: "ecdsa" },
+      sessionToken
+    );
+    const { json } = await post(
+      `/v1/identities/${identityId}/sign`,
+      { digest, ticket: intent.json.ticket, signature_type: "ecdsa" },
+      sessionToken
+    );
+
+    // Recover public key from ECDSA signature (v3 API: signature first, then message)
+    const sigBytes = secp.etc.hexToBytes(json.signature); // 65 bytes: r(32) + s(32) + recovery(1)
+    const msgBytes = secp.etc.hexToBytes(digest);
+    const recovered = secp.recoverPublicKey(sigBytes, msgBytes, { prehash: false });
+    const recoveredHex = secp.etc.bytesToHex(recovered);
+
+    expect(recoveredHex).toBe(publicKey);
+  });
+
+  it("sign-batch with mixed signature types", async () => {
+    const digest1 = randomBytes(32).toString("hex");
+    const digest2 = randomBytes(32).toString("hex");
+
+    const { status, json } = await post(
+      `/v1/identities/${identityId}/sign-batch`,
+      {
+        digests: [
+          { digest: digest1, signature_type: "schnorr" },
+          { digest: digest2, signature_type: "ecdsa" },
+        ],
+      },
+      sessionToken
+    );
+    expect(status).toBe(200);
+    expect(json.signatures).toHaveLength(2);
+
+    // First: Schnorr (64 bytes = 128 hex)
+    expect(json.signatures[0].signature.length).toBe(128);
+    expect(json.signatures[0].r).toBeUndefined();
+
+    // Second: ECDSA (65 bytes = 130 hex)
+    expect(json.signatures[1].signature.length).toBe(130);
+    expect(json.signatures[1].r).toBeDefined();
+    expect(json.signatures[1].s).toBeDefined();
+    expect([27, 28]).toContain(json.signatures[1].v);
+  });
+
+  it("cleanup: destroy identity", async () => {
+    await del(`/v1/identities/${identityId}`, sessionToken);
+  });
+});
+
 describe("Auth guards", () => {
   it("POST /v1/identities without token returns 401", async () => {
     const { status } = await post("/v1/identities", { alg: "secp256k1" });

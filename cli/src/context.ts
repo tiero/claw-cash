@@ -20,6 +20,7 @@ const DATA_DIR = join(homedir(), ".clw-cash", "data");
 const LENDASWAP_DB = join(homedir(), ".clw-cash", "lendaswap.db");
 
 export interface CashContext {
+  identity: RemoteSignerIdentity;
   bitcoin: ArkadeBitcoinSkill;
   lightning: ArkadeLightningSkill;
   swap: LendaSwapSkill;
@@ -67,6 +68,7 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
   });
 
   return {
+    identity,
     bitcoin,
     lightning,
     swap,

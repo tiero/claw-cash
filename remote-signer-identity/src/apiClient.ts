@@ -1,5 +1,6 @@
 import type {
   CreateIdentityResponse,
+  EcdsaSignResponse,
   ListIdentitiesResponse,
   SignBatchResponse,
   SignIntentResponse,
@@ -61,6 +62,18 @@ export class ClwApiClient {
     return signed.signature;
   }
 
+  /** Sign a single digest with ECDSA, returning r, s, v */
+  async signDigestEcdsa(digestHex: string): Promise<EcdsaSignResponse> {
+    const intent = await this.signIntent(digestHex, "ecdsa");
+    const signed = await this.sign(digestHex, intent.ticket, "ecdsa");
+    return {
+      signature: signed.signature,
+      r: signed.r!,
+      s: signed.s!,
+      v: signed.v!,
+    };
+  }
+
   /** Sign multiple digests in a single batch call */
   async signDigestBatch(
     digests: Array<{ digest: string }>
@@ -72,24 +85,25 @@ export class ClwApiClient {
       }
     );
     const body = await ClwApiClient.handleResponse<SignBatchResponse>(res);
-    return body.signatures;
+    return body.signatures.map((s) => typeof s === "string" ? s : s.signature);
   }
 
-  private async signIntent(digestHex: string): Promise<SignIntentResponse> {
+  private async signIntent(digestHex: string, signatureType: "schnorr" | "ecdsa" = "schnorr"): Promise<SignIntentResponse> {
     const res = await this.request(
       `/v1/identities/${this.identityId}/sign-intent`,
-      { digest: digestHex }
+      { digest: digestHex, signature_type: signatureType }
     );
     return ClwApiClient.handleResponse<SignIntentResponse>(res);
   }
 
   private async sign(
     digestHex: string,
-    ticket: string
+    ticket: string,
+    signatureType: "schnorr" | "ecdsa" = "schnorr"
   ): Promise<SignResponse> {
     const res = await this.request(
       `/v1/identities/${this.identityId}/sign`,
-      { digest: digestHex, ticket }
+      { digest: digestHex, ticket, signature_type: signatureType }
     );
     return ClwApiClient.handleResponse<SignResponse>(res);
   }

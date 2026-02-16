@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "start": "tsx src/index.ts",
-    "dev": "tsx watch src/index.ts",
+    "dev": "ENCLAVE_DEV_MODE=true tsx watch src/index.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

@@ -11,13 +11,8 @@ database_id = "e09e3b97-6ae9-4778-b029-e7f2f5bf24f8"  # Fill after: wrangler d1 
 migrations_dir = "migrations"
 
 # KV Namespaces — fill IDs after creating with:
-#   npx wrangler kv namespace create KV_CHALLENGES
 #   npx wrangler kv namespace create KV_TICKETS
 #   npx wrangler kv namespace create KV_RATE_LIMIT
-[[kv_namespaces]]
-binding = "KV_CHALLENGES"
-id = "fb473564b119462d98235427fcb558c7"
-
 [[kv_namespaces]]
 binding = "KV_TICKETS"
 id = "419b8e6d63084afaaa245d9b3fb6faf7"
@@ -64,10 +59,6 @@ binding = "DB"
 database_name = "clw-cash-db"
 database_id = "e09e3b97-6ae9-4778-b029-e7f2f5bf24f8"
 migrations_dir = "migrations"
-
-[[env.production.kv_namespaces]]
-binding = "KV_CHALLENGES"
-id = "fb473564b119462d98235427fcb558c7"
 
 [[env.production.kv_namespaces]]
 binding = "KV_TICKETS"

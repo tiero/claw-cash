@@ -3,7 +3,6 @@ export interface Env {
   DB: D1Database;
 
   // KV Namespaces
-  KV_CHALLENGES: KVNamespace;
   KV_TICKETS: KVNamespace;
   KV_RATE_LIMIT: KVNamespace;
 

@@ -3,7 +3,6 @@ import type { AuditEvent, Challenge, Identity, KeyBackup, Ticket, User } from ".
 export class CloudflareStore {
   constructor(
     private readonly db: D1Database,
-    private readonly kvChallenges: KVNamespace,
     private readonly kvTickets: KVNamespace,
     private readonly challengeTtlSeconds: number,
   ) {}
@@ -81,7 +80,7 @@ export class CloudflareStore {
     await this.kvTickets.put(ticketId, JSON.stringify(ticket));
   }
 
-  // ── Challenges (KV with TTL) ───────────────────────────────
+  // ── Challenges (D1 for strong consistency) ──────────────────
 
   async createChallenge(): Promise<Challenge> {
     const now = new Date();
@@ -91,24 +90,27 @@ export class CloudflareStore {
       created_at: now.toISOString(),
       expires_at: new Date(now.getTime() + this.challengeTtlSeconds * 1000).toISOString(),
     };
-    await this.kvChallenges.put(challenge.id, JSON.stringify(challenge), {
-      expirationTtl: this.challengeTtlSeconds,
-    });
+    await this.db
+      .prepare("INSERT INTO challenges (id, telegram_user_id, created_at, expires_at) VALUES (?, ?, ?, ?)")
+      .bind(challenge.id, null, challenge.created_at, challenge.expires_at)
+      .run();
     return challenge;
   }
 
   async getChallenge(challengeId: string): Promise<Challenge | undefined> {
-    const raw = await this.kvChallenges.get(challengeId);
-    if (!raw) return undefined;
-    return JSON.parse(raw) as Challenge;
+    const row = await this.db
+      .prepare("SELECT * FROM challenges WHERE id = ? AND expires_at > ?")
+      .bind(challengeId, new Date().toISOString())
+      .first<Challenge>();
+    return row ?? undefined;
   }
 
   async resolveChallenge(challengeId: string, telegramUserId: string): Promise<boolean> {
-    const challenge = await this.getChallenge(challengeId);
-    if (!challenge || challenge.telegram_user_id !== null) return false;
-    challenge.telegram_user_id = telegramUserId;
-    await this.kvChallenges.put(challengeId, JSON.stringify(challenge));
-    return true;
+    const result = await this.db
+      .prepare("UPDATE challenges SET telegram_user_id = ? WHERE id = ? AND telegram_user_id IS NULL AND expires_at > ?")
+      .bind(telegramUserId, challengeId, new Date().toISOString())
+      .run();
+    return (result.meta?.changes ?? 0) > 0;
   }
 
   // ── Audit Events ───────────────────────────────────────────

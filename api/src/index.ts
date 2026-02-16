@@ -42,7 +42,7 @@ app.use("/v1/*", async (c, next) => {
 // ── Helpers ───────────────────────────────────────────────────
 
 function getStore(env: Env): CloudflareStore {
-  return new CloudflareStore(env.DB, env.KV_CHALLENGES, env.KV_TICKETS, parseInt(env.CHALLENGE_TTL_SECONDS, 10));
+  return new CloudflareStore(env.DB, env.KV_TICKETS, parseInt(env.CHALLENGE_TTL_SECONDS, 10));
 }
 
 function getLimiter(env: Env): KVRateLimiter {

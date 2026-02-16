@@ -150,20 +150,6 @@
       color: var(--orange);
     }
 
-    .pun {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      color: var(--gray);
-      margin-bottom: 32px;
-    }
-
-    .pun code {
-      background: var(--code-bg);
-      padding: 4px 8px;
-      border-radius: 4px;
-      color: var(--light);
-    }
-
     .tagline {
       font-size: clamp(18px, 3vw, 24px);
       color: var(--gray);
@@ -822,13 +808,12 @@
   <header class="hero">
     <div class="container">
       <div class="badge">
-        <span>₿</span> Built for autonomous agents
+        <span>₿</span> Human-to-Agent Payments
       </div>
       <h1><span class="claw">Claw</span> Cash</h1>
-      <p class="pun">You write <code>clw</code>, but humans better pronounce <em>claw</em> 🦞</p>
       <p class="tagline">
-        <strong>Humans pay in stablecoins.</strong> Agents settle in Bitcoin.<br>
-        The only money an LLM can cryptographically verify.
+        <strong>Stablecoins in. Bitcoin out.</strong><br>
+        Money agents can trust, and verify.
       </p>
       <div class="cta-group">
         <a href="https://www.npmjs.com/package/clw-cash" class="btn btn-primary" style="font-family: 'JetBrains Mono', monospace; font-size: 15px;">
@@ -842,19 +827,18 @@
   <!-- The Problem -->
   <section id="problem">
     <div class="container">
-      <h2>The Trust Problem</h2>
+      <h2>The Trust Issue</h2>
       <p class="section-lead">
-        An AI agent can't call the Federal Reserve to verify the dollar's value. 
-        It can only trust what the internet tells it—and that can be manipulated.
+        An autonomous agent can receive money. But can it verify what it's holding?
       </p>
       <div class="problem-grid">
         <div class="problem-card bad">
           <h3><span class="icon red">✗</span> Fiat Currency</h3>
-          <p>Value based on institutional trust, government policy, and economic sentiment. An LLM has no way to verify any of this—it's just text from the web, trivially spoofed.</p>
+          <p>Value derived from institutional trust, government policy, and economic sentiment. None of this is independently verifiable by code. An agent consuming fiat data is trusting its context window.</p>
         </div>
         <div class="problem-card bad">
-          <h3><span class="icon red">✗</span> Internet Data</h3>
-          <p>Exchange rates, inflation numbers, economic reports—all can be fabricated in the agent's context window. Garbage in, garbage out.</p>
+          <h3><span class="icon red">✗</span> External Data</h3>
+          <p>Exchange rates, inflation data, economic reports. All inputs an agent can consume but never independently verify. The context window is the attack surface.</p>
         </div>
         <div class="problem-card good">
           <h3><span class="icon green">✓</span> Bitcoin</h3>

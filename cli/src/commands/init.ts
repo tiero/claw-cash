@@ -82,13 +82,25 @@ export async function handleInit(args: ParsedArgs): Promise<never> {
   }
 
   if (!config.identityId || !config.publicKey) {
-    // No identity yet — create a new one
-    const identity = await ClwApiClient.createIdentity(
-      config.apiBaseUrl,
-      config.sessionToken
-    );
-    config.identityId = identity.id;
-    config.publicKey = identity.public_key;
+    // No identity in local config — check server for existing ones
+    const existing = await ClwApiClient.listIdentities(config.apiBaseUrl, config.sessionToken);
+
+    if (existing.items.length > 0) {
+      // Recover the most recent active identity
+      const identity = existing.items[0];
+      config.identityId = identity.id;
+      config.publicKey = identity.public_key;
+      await restoreIdentity(config);
+      console.error(`Recovered existing identity: ${identity.id}`);
+    } else {
+      // No existing identities — create a new one
+      const identity = await ClwApiClient.createIdentity(
+        config.apiBaseUrl,
+        config.sessionToken
+      );
+      config.identityId = identity.id;
+      config.publicKey = identity.public_key;
+    }
   } else {
     // Identity exists in config — ensure it's registered on the API (survives server restarts)
     await restoreIdentity(config);

@@ -67,8 +67,9 @@ const argv = minimist(process.argv.slice(2), {
   string: [
     "amount", "currency", "where", "to", "address", "id",
     "api-url", "token", "ark-server", "network", "port",
+    "bot-token", "chat-id", "message-id",
   ],
-  boolean: ["help", "version", "daemon-internal"],
+  boolean: ["help", "version", "daemon-internal", "start"],
   alias: { h: "help", v: "version" },
 });
 
@@ -99,7 +100,7 @@ async function main() {
         await handleInit(argv);
         return;
       case "login":
-        await handleLogin();
+        await handleLogin(argv);
         return;
       case "config":
         await handleConfig();
@@ -248,6 +249,7 @@ async function refreshSession(config: import("./config.js").CashConfig): Promise
 async function runDaemon() {
   const { saveDaemonPid, removeDaemonPid } = await import("./daemon.js");
   const { SwapMonitor } = await import("./monitor.js");
+  const { AuthMonitor } = await import("./authMonitor.js");
   const { createDaemonServer } = await import("./server.js");
 
   const port = argv.port ? parseInt(argv.port as string, 10) : 3457;
@@ -263,7 +265,8 @@ async function runDaemon() {
 
   const ctx = await createContext(config, { enableSwapManager: true });
   const monitor = new SwapMonitor(ctx);
-  const server = createDaemonServer({ port, ctx, monitor });
+  const authMonitor = new AuthMonitor();
+  const server = createDaemonServer({ port, ctx, monitor, authMonitor });
 
   // Start Lightning SwapManager
   await ctx.lightning.startSwapManager();
@@ -283,6 +286,7 @@ async function runDaemon() {
   const shutdown = async () => {
     console.error("[daemon] shutting down...");
     monitor.stop();
+    authMonitor.stop();
     await ctx.lightning.stopSwapManager();
     await ctx.dispose();
     server.close();

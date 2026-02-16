@@ -151,7 +151,7 @@
     }
 
     .tagline {
-      font-size: clamp(18px, 3vw, 24px);
+      font-size: clamp(20px, 3.5vw, 28px);
       color: var(--gray);
       max-width: 600px;
       margin-bottom: 48px;
@@ -198,6 +198,53 @@
 
     .btn-secondary:hover {
       border-color: var(--orange);
+    }
+
+    /* Terminal inline block */
+    .terminal-inline {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--code-bg);
+      border: 1px solid #333;
+      border-radius: 8px;
+      padding: 14px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+
+    .terminal-inline:hover {
+      border-color: var(--orange);
+    }
+
+    .terminal-prompt {
+      color: var(--orange);
+      user-select: none;
+    }
+
+    .terminal-cmd {
+      color: var(--light);
+    }
+
+    .copy-btn {
+      background: none;
+      border: none;
+      color: var(--gray);
+      cursor: pointer;
+      padding: 4px;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+    }
+
+    .copy-btn:hover {
+      color: var(--orange);
+    }
+
+    .copy-btn.copied {
+      color: #4ade80;
     }
 
     /* Sections */
@@ -744,6 +791,114 @@
       font-size: 15px;
     }
 
+    /* FAQ */
+    .faq-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin-top: 48px;
+    }
+
+    .faq-item {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .faq-item summary {
+      padding: 24px 32px;
+      font-size: 17px;
+      font-weight: 600;
+      cursor: pointer;
+      list-style: none;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .faq-item summary::-webkit-details-marker { display: none; }
+
+    .faq-item summary::after {
+      content: '+';
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 20px;
+      color: var(--orange);
+      transition: transform 0.2s;
+    }
+
+    .faq-item[open] summary::after {
+      content: '−';
+    }
+
+    .faq-item .faq-answer {
+      padding: 0 32px 24px;
+      color: var(--gray);
+      font-size: 15px;
+      line-height: 1.7;
+    }
+
+    .faq-item .faq-answer code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      background: #1a1a1a;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--orange);
+    }
+
+    /* Roadmap */
+    .roadmap-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .roadmap-card {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    .roadmap-card h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .roadmap-card p {
+      color: var(--gray);
+      font-size: 15px;
+    }
+
+    .roadmap-tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 12px;
+      display: inline-block;
+    }
+
+    .roadmap-tag.now {
+      background: #1a2a1a;
+      color: #4ade80;
+    }
+
+    .roadmap-tag.next {
+      background: #2a2a1a;
+      color: #facc15;
+    }
+
+    .roadmap-tag.later {
+      background: #1a1a2a;
+      color: #60a5fa;
+    }
+
     /* Manifesto */
     .manifesto {
       background: linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
@@ -816,10 +971,15 @@
         Money agents can trust, and verify.
       </p>
       <div class="cta-group">
-        <a href="https://www.npmjs.com/package/clw-cash" class="btn btn-primary" style="font-family: 'JetBrains Mono', monospace; font-size: 15px;">
-          npx clw-cash init
-        </a>
-        <a href="#how-it-works" class="btn btn-secondary">How it Works</a>
+        <div class="terminal-inline" onclick="copyCommand(this)" title="Click to copy">
+          <span class="terminal-prompt">$</span>
+          <span class="terminal-cmd">npx clw-cash init</span>
+          <button class="copy-btn" aria-label="Copy to clipboard">
+            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
+        <a href="/SKILL.md" class="btn btn-primary">Agent Skill (SKILL.md)</a>
       </div>
     </div>
   </header>
@@ -890,16 +1050,16 @@
         </div>
         <div class="code-body">
 <span class="comment"># Receive USDT from a human on Polygon</span>
-<span class="cmd">clw-cash</span> receive <span class="flag">--amount</span> <span class="value">10</span> <span class="flag">--currency</span> <span class="value">usdt</span> <span class="flag">--where</span> <span class="value">polygon</span>
+<span class="cmd">cash</span> receive <span class="flag">--amount</span> <span class="value">10</span> <span class="flag">--currency</span> <span class="value">usdt</span> <span class="flag">--where</span> <span class="value">polygon</span>
 
 <span class="comment"># Check your balance (BTC + stables)</span>
-<span class="cmd">clw-cash</span> balance
+<span class="cmd">cash</span> balance
 
 <span class="comment"># Pay another agent via Arkade</span>
-<span class="cmd">clw-cash</span> send <span class="flag">--amount</span> <span class="value">50000</span> <span class="flag">--currency</span> <span class="value">btc</span> <span class="flag">--where</span> <span class="value">arkade</span> <span class="flag">--to</span> <span class="value">ark1q...</span>
+<span class="cmd">cash</span> send <span class="flag">--amount</span> <span class="value">50000</span> <span class="flag">--currency</span> <span class="value">btc</span> <span class="flag">--where</span> <span class="value">arkade</span> <span class="flag">--to</span> <span class="value">ark1q...</span>
 
 <span class="comment"># Pay a human via Lightning</span>
-<span class="cmd">clw-cash</span> send <span class="value">lnbc500n1...</span>
+<span class="cmd">cash</span> send <span class="value">lnbc500n1...</span>
         </div>
       </div>
     </div>
@@ -1031,8 +1191,8 @@
       </p>
       <div class="usecase-grid">
         <div class="usecase-card">
-          <h3><span>⚡</span> Pay for Compute</h3>
-          <p>Agents pay for their own inference, cloud functions, and hosting. LLM APIs, VPS, storage—settle in sats, no credit card required.</p>
+          <h3><span>⚡</span> Pay for APIs (x402)</h3>
+          <p>Agent hits a paywall, gets a 402. Claw Cash swaps BTC to stablecoins on the fly and pays. Hold sats, spend dollars—automatically.</p>
         </div>
         <div class="usecase-card">
           <h3><span>🤖</span> Pay Other Agents</h3>
@@ -1091,6 +1251,93 @@
     </div>
   </section>
 
+  <!-- Roadmap -->
+  <section id="roadmap">
+    <div class="container">
+      <h2>Roadmap</h2>
+      <p class="section-lead">
+        What we're building, in order.
+      </p>
+      <div class="roadmap-grid">
+        <div class="roadmap-card">
+          <div class="roadmap-tag now">NOW</div>
+          <h3>MCP Server</h3>
+          <p>Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>x402 Client Support</h3>
+          <p><code>cash pay &lt;url&gt;</code> command. Detect <code>402 Payment Required</code>, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>).</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>Spending Policies</h3>
+          <p>Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>More Auth Providers</h3>
+          <p>Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag later">LATER</div>
+          <h3>Persistent Storage</h3>
+          <p>Replace in-memory store with PostgreSQL. Durable state across restarts for production deployments.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag later">LATER</div>
+          <h3>Webhook Notifications</h3>
+          <p>Get notified when transactions complete, swaps settle, or balances change. Push events to your agent's event loop.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="container">
+      <h2>FAQ</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Why Bitcoin instead of stablecoins?</summary>
+          <div class="faq-answer">
+            Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>How does x402 payment work?</summary>
+          <div class="faq-answer">
+            When an agent hits an API that returns <code>402 Payment Required</code>, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in <a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Where are the private keys stored?</summary>
+          <div class="faq-answer">
+            Inside an Evervault Enclave. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel. Even if the host machine is compromised, the keys remain inaccessible.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>What currencies and networks are supported?</summary>
+          <div class="faq-answer">
+            Bitcoin on-chain, Lightning, and Arkade (instant off-chain). For stablecoins: USDC and USDT on Polygon, Arbitrum, and Ethereum. The agent holds BTC and swaps to stablecoins on demand via LendaSwap and Boltz.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Can my Telegram bot use this?</summary>
+          <div class="faq-answer">
+            Yes. Claw Cash acts as a factory bot — your Telegram bot authenticates with a shared API key and gets per-user sessions via <code>POST /v1/auth/bot-session</code>. Each Telegram user gets their own enclave-backed identity. No user-facing auth flow needed.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>How fast are agent-to-agent payments?</summary>
+          <div class="faq-answer">
+            Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immediately with minimal fees — no block confirmations needed. Lightning payments are also near-instant for paying external services.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
   <!-- CTA -->
   <section id="get-started">
     <div class="container" style="text-align: center;">
@@ -1099,9 +1346,14 @@
         One CLI. Bitcoin + stablecoins. Built for machines.
       </p>
       <div class="cta-group" style="justify-content: center;">
-        <a href="https://www.npmjs.com/package/clw-cash" class="btn btn-primary" style="font-family: 'JetBrains Mono', monospace; font-size: 15px;">
-          npx clw-cash init
-        </a>
+        <div class="terminal-inline" onclick="copyCommand(this)" title="Click to copy">
+          <span class="terminal-prompt">$</span>
+          <span class="terminal-cmd">npx clw-cash init</span>
+          <button class="copy-btn" aria-label="Copy to clipboard">
+            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
+          </button>
+        </div>
         <a href="https://github.com/tiero" class="btn btn-secondary">
           Author
         </a>
@@ -1112,11 +1364,31 @@
   <footer>
     <div class="container">
       <p>
+        <a href="/SKILL.md">Agent Skill (SKILL.md)</a> ·
         Built by <a href="https://github.com/tiero">tiero</a> ·
         Powered by <a href="https://arkadeos.com">👾 Arkade</a> ·
         <a href="https://t.me/arkade_os">Telegram</a>
       </p>
     </div>
   </footer>
+
+  <script>
+  function copyCommand(el) {
+    var cmd = el.querySelector('.terminal-cmd').textContent.trim();
+    navigator.clipboard.writeText(cmd).then(function() {
+      var btn = el.querySelector('.copy-btn');
+      var copyIcon = btn.querySelector('.copy-icon');
+      var checkIcon = btn.querySelector('.check-icon');
+      btn.classList.add('copied');
+      copyIcon.style.display = 'none';
+      checkIcon.style.display = 'block';
+      setTimeout(function() {
+        btn.classList.remove('copied');
+        copyIcon.style.display = 'block';
+        checkIcon.style.display = 'none';
+      }, 2000);
+    });
+  }
+  </script>
 </body>
 </html>

@@ -1,11 +1,41 @@
 import { loadConfig, saveConfig } from "../config.js";
 import { outputSuccess, outputError } from "../output.js";
 import { getDaemonStatus, stopDaemon, startDaemonInBackground, getPort } from "../daemon.js";
+import { daemonPost } from "../daemonClient.js";
 
 const POLL_INTERVAL_MS = 2000;
 const POLL_TIMEOUT_MS = 120_000;
 
-export async function handleLogin(): Promise<never> {
+export async function handleLogin(argv?: Record<string, unknown>): Promise<never> {
+  // Non-blocking mode: delegate to daemon for background polling + Telegram reply
+  if (argv?.start) {
+    const botToken = argv["bot-token"] as string;
+    const chatId = Number(argv["chat-id"]);
+    const messageId = Number(argv["message-id"]);
+
+    if (!botToken || !chatId || !messageId) {
+      return outputError("--start requires --bot-token, --chat-id, and --message-id");
+    }
+
+    const status = getDaemonStatus();
+    if (!status.running) {
+      return outputError("Daemon is not running. Run 'cash start' first.");
+    }
+
+    const result = (await daemonPost("/auth/start", {
+      botToken,
+      chatId,
+      messageId,
+    })) as { challengeId: string; deepLink: string | null };
+
+    return outputSuccess({
+      message: "Auth started. Daemon will poll and reply via Telegram when done.",
+      challengeId: result.challengeId,
+      deepLink: result.deepLink,
+    });
+  }
+
+  // Original blocking mode
   const config = loadConfig();
 
   if (!config.apiBaseUrl) {
@@ -64,7 +94,7 @@ export async function handleLogin(): Promise<never> {
       config.sessionToken = session.token;
       saveConfig(config);
 
-      // If identity exists in config, restore it on the API
+      // Restore or recover identity
       if (config.identityId && config.publicKey) {
         const restoreRes = await fetch(
           `${config.apiBaseUrl}/v1/identities/${config.identityId}/restore`,
@@ -80,6 +110,41 @@ export async function handleLogin(): Promise<never> {
         if (!restoreRes.ok) {
           const text = await restoreRes.text();
           console.error(`Warning: identity restore failed: ${text}`);
+        }
+      } else {
+        // Config wiped — try to recover existing identity from server
+        try {
+          const listRes = await fetch(`${config.apiBaseUrl}/v1/identities`, {
+            headers: { authorization: `Bearer ${session.token}` },
+          });
+          if (listRes.ok) {
+            const data = (await listRes.json()) as { items: Array<{ id: string; public_key: string }> };
+            if (data.items.length > 0) {
+              const identity = data.items[0];
+              config.identityId = identity.id;
+              config.publicKey = identity.public_key;
+              saveConfig(config);
+
+              const restoreRes = await fetch(
+                `${config.apiBaseUrl}/v1/identities/${identity.id}/restore`,
+                {
+                  method: "POST",
+                  headers: {
+                    "content-type": "application/json",
+                    authorization: `Bearer ${session.token}`,
+                  },
+                  body: JSON.stringify({ public_key: identity.public_key }),
+                }
+              );
+              if (restoreRes.ok) {
+                console.error(`Recovered existing identity: ${identity.id}`);
+              } else {
+                console.error(`Warning: identity recovery restore failed: ${await restoreRes.text()}`);
+              }
+            }
+          }
+        } catch (err) {
+          console.error(`Warning: identity recovery failed: ${err instanceof Error ? err.message : err}`);
         }
       }
 

@@ -4,18 +4,41 @@ A command-line tool for sending and receiving Bitcoin and stablecoins. Keys are 
 
 Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = success, 1 = error.
 
+## Agent Rules
+
+- **Run commands directly.** No narration before or after. Just run the command and return the result.
+- **Never poll or retry.** Commands exit on their own. If a command fails, report the error — don't retry.
+- **Ask before sending.** Always confirm with the user before running `cash send`. Balance checks and receives are safe.
+- **One command at a time.** Don't chain or batch. Run, read output, decide next step.
+- **Timeouts:** 30s default, 120s for `cash init`.
+- **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
+
 ## Setup
 
 ```bash
+# Install globally
+npm install -g clw-cash
 # First time — authenticates, creates identity, saves config, starts daemon
 cash init
-# Re-authenticate when session expires
+# Re-authenticate when session expires (blocking — waits up to 120s)
 cash login
 ```
 
-`init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). It creates an identity, saves config to `~/.clw-cash/config.json`, and **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
+`init` handles authentication automatically (Telegram 2FA in production, auto-resolves in test mode). If an identity already exists on the server (e.g., from a previous install or sandbox reset), it **auto-recovers** it instead of creating a new one. Config is saved to `~/.clw-cash/config.json`, and it **auto-starts a background daemon** for monitoring swaps (Lightning HTLC claiming and LendaSwap polling).
 
-If the session token expires, run `cash login` to re-authenticate. If the daemon stops, restart it with `cash start`.
+If the session token expires, run `cash login` to re-authenticate. The daemon can be stopped with `cash stop` and restarted with `cash start`.
+
+### Non-blocking Auth (for Telegram bots)
+
+When running as a Telegram bot, use `--start` to avoid blocking. The daemon polls in the background and sends a Telegram reply when auth completes:
+
+```bash
+# Returns immediately with a deep link. Daemon handles the rest.
+cash login --start --bot-token <TELEGRAM_BOT_TOKEN> --chat-id <CHAT_ID> --message-id <MSG_ID>
+# -> {"ok": true, "data": {"deepLink": "https://t.me/clw_cash_bot?start=...", "challengeId": "..."}}
+```
+
+The daemon will reply to `<MSG_ID>` with "Connected, welcome back!" once the user authenticates via the deep link. Requires the daemon to be running (`cash start`).
 
 You can also pass flags explicitly: `cash init --api-url <url> --token <jwt> --ark-server <url> --network <bitcoin|testnet>`.
 

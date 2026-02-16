@@ -7,7 +7,9 @@ External API service for user/session management, identity metadata, ticket issu
 - `POST /v1/users` — create or get user (returns `confirm_token` if pending)
 - `POST /v1/users/confirm` — confirm user account with token
 - `POST /v1/sessions` — create session (requires confirmed user)
+- `GET /v1/identities` — list active identities for authenticated user
 - `POST /v1/identities`
+- `POST /v1/identities/:id/restore` — restore identity from sealed backup
 - `POST /v1/identities/:id/sign-intent`
 - `POST /v1/identities/:id/sign`
 - `DELETE /v1/identities/:id`

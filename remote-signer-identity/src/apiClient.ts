@@ -1,5 +1,6 @@
 import type {
   CreateIdentityResponse,
+  ListIdentitiesResponse,
   SignBatchResponse,
   SignIntentResponse,
   SignResponse,
@@ -40,6 +41,17 @@ export class ClwApiClient {
       body: JSON.stringify({ alg: "secp256k1" }),
     });
     return ClwApiClient.handleResponse<CreateIdentityResponse>(res);
+  }
+
+  /** List all active identities for the authenticated user */
+  static async listIdentities(
+    baseUrl: string,
+    sessionToken: string
+  ): Promise<ListIdentitiesResponse> {
+    const res = await fetch(`${baseUrl}/v1/identities`, {
+      headers: { authorization: `Bearer ${sessionToken}` },
+    });
+    return ClwApiClient.handleResponse<ListIdentitiesResponse>(res);
   }
 
   /** Sign a single digest via the two-step flow (sign-intent → sign) */

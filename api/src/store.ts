@@ -58,6 +58,14 @@ export class CloudflareStore {
     await this.db.prepare("UPDATE identities SET status = 'destroyed' WHERE id = ?").bind(identityId).run();
   }
 
+  async listIdentitiesForUser(userId: string): Promise<Identity[]> {
+    const result = await this.db
+      .prepare("SELECT * FROM identities WHERE user_id = ? AND status = 'active' ORDER BY created_at DESC")
+      .bind(userId)
+      .all<Identity>();
+    return result.results ?? [];
+  }
+
   // ── Tickets (KV with TTL) ──────────────────────────────────
 
   async createTicket(input: Omit<Ticket, "used_at">, ttlSeconds: number): Promise<Ticket> {

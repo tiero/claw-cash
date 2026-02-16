@@ -31,7 +31,7 @@ Shows BTC (onchain, lightning, arkade) and stablecoin balances.
 ### Send BTC to another agent via Ark
 
 ```bash
-cash send --amount 50000 --currency btc --where arkade --to ark1q...
+cash send --amount 50000 --currency sats --where arkade --to ark1q...
 ```
 
 Amount is in satoshis. Instant settlement, minimal fees.

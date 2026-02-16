@@ -60,13 +60,13 @@ CLW_DAEMON_PORT=3457          # default: 3457
 
 ```bash
 # Send sats via Ark (instant, off-chain)
-cash send --amount 100000 --currency btc --where arkade --to <ark-address>
+cash send --amount 100000 --currency sats --where arkade --to <ark-address>
 
 # Send sats on-chain
-cash send --amount 100000 --currency btc --where onchain --to <bitcoin-address>
+cash send --amount 100000 --currency sats --where onchain --to <bitcoin-address>
 
 # Pay a Lightning invoice
-cash send --amount 50000 --currency btc --where lightning --to <bolt11-invoice>
+cash send --amount 50000 --currency sats --where lightning --to <bolt11-invoice>
 
 # Auto-detect invoice format (bolt11 or BIP21, positional arg)
 cash send lnbc500n1pj...
@@ -87,15 +87,15 @@ cash send --amount 50 --currency usdc --where arbitrum --to <0x-address>
 
 ```bash
 # Get an Ark address
-cash receive --amount 100000 --currency btc --where arkade
+cash receive --amount 100000 --currency sats --where arkade
 # -> {"ok": true, "data": {"address": "ark1q...", "type": "ark", "amount": 100000}}
 
 # Create a Lightning invoice
-cash receive --amount 50000 --currency btc --where lightning
+cash receive --amount 50000 --currency sats --where lightning
 # -> {"ok": true, "data": {"bolt11": "lnbc...", "paymentHash": "...", "amount": 50000}}
 
 # Get a boarding (on-chain) address
-cash receive --amount 100000 --currency btc --where onchain
+cash receive --amount 100000 --currency sats --where onchain
 # -> {"ok": true, "data": {"address": "bc1q...", "type": "onchain", "amount": 100000}}
 ```
 
@@ -195,11 +195,12 @@ Error (stderr):
 
 ## Currency & Network Matrix
 
-| Currency   | Networks                    | Notes                          |
-| ---------- | --------------------------- | ------------------------------ |
-| btc / sats | onchain, lightning, arkade  | Both accept amounts in satoshis |
-| usdt       | polygon, ethereum, arbitrum |                                |
-| usdc       | polygon, ethereum, arbitrum |                                |
+| Currency | Networks                    | Notes                                     |
+| -------- | --------------------------- | ----------------------------------------- |
+| sats     | onchain, lightning, arkade  | Amount in satoshis (use `sats` not `btc`) |
+| btc      | onchain, lightning, arkade  | Amount in BTC (e.g. 0.001)                |
+| usdt     | polygon, ethereum, arbitrum |                                           |
+| usdc     | polygon, ethereum, arbitrum |                                           |
 
 ## Swap Status Lifecycle
 
@@ -242,10 +243,10 @@ cash status | jq .data.session
 cash swaps --pending | jq '[.data.lendaswap.pending[].id]'
 
 # Get the payment bolt11 invoice
-cash receive --amount 50000 --currency btc --where lightning | jq -r .data.bolt11
+cash receive --amount 50000 --currency sats --where lightning | jq -r .data.bolt11
 
 # Get the ark address for receiving
-cash receive --amount 100000 --currency btc --where arkade | jq -r .data.address
+cash receive --amount 100000 --currency sats --where arkade | jq -r .data.address
 
 # Get the payment URL for stablecoin receive
 cash receive --amount 10 --currency usdc | jq -r .data.paymentUrl

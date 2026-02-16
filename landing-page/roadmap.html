@@ -42,14 +42,19 @@
       </p>
       <div class="roadmap-grid">
         <div class="roadmap-card">
+          <div class="roadmap-tag shipped">SHIPPED</div>
+          <h3>x402 Payments</h3>
+          <p><code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash fetch &lt;url&gt;</code> — detect <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">402 Payment Required</code>, auto-swap BTC to USDC, sign via ECDSA, retry with proof. Supports Polygon, Arbitrum, Ethereum via Thirdweb facilitators.</p>
+        </div>
+        <div class="roadmap-card">
           <div class="roadmap-tag now">NOW</div>
           <h3>MCP Server</h3>
           <p>Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.</p>
         </div>
         <div class="roadmap-card">
           <div class="roadmap-tag next">NEXT</div>
-          <h3>x402 Client Support</h3>
-          <p><code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay &lt;url&gt;</code> command. Detect <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">402 Payment Required</code>, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>).</p>
+          <h3>Bitcoin x402 Facilitator</h3>
+          <p>Pay x402 APIs directly with sats — Lightning, Arkade, or on-chain. No stablecoin swap needed. BIP-322 signed proofs, native Bitcoin settlement.</p>
         </div>
         <div class="roadmap-card">
           <div class="roadmap-tag next">NEXT</div>

@@ -156,6 +156,25 @@ cash refund <swap-id>
 cash refund <swap-id> --address <destination>
 ```
 
+### Pay x402-Protected APIs
+
+```bash
+# Fetch a URL — if 402, auto-swap BTC to USDC and pay
+cash fetch https://public.zapper.xyz/x402/token-price --method POST --body '{"address":"0x...","chainId":137}'
+# -> {"ok": true, "data": { ... response from paid API ... }}
+
+# GET request (default method)
+cash fetch https://search.reversesandbox.com/web/search?q=bitcoin
+# -> {"ok": true, "data": "...search results..."}
+
+# Custom headers
+cash fetch https://api.example.com/paid --header "Accept:application/json"
+```
+
+Flow: request → 402 detected → parse payment requirements (chain, amount, asset) → swap BTC to USDC on the required chain (Polygon, Arbitrum, Ethereum) via LendaSwap → sign EIP-3009 authorization via ECDSA → retry with x402 payment proof.
+
+The agent holds BTC as treasury. USDC is swapped on demand, authorized to the facilitator, and never held as a reserve.
+
 ### Daemon (Swap Monitoring)
 
 The daemon runs in the background to automatically claim Lightning HTLCs and monitor LendaSwap swaps. It is **auto-started by `cash init`**. Use these commands to manage it manually:
@@ -252,6 +271,18 @@ cash receive --amount 10 --currency usdc | jq -r .data.paymentUrl
 
 # Check if a command succeeded
 cash send ... && echo "sent" || echo "failed"
+
+# Pay for an x402-protected API
+cash fetch https://public.zapper.xyz/x402/token-price --method POST --body '{"address":"0x...","chainId":137}'
+```
+
+Common workflow for paying an x402 API:
+
+```bash
+# 1. Fetch the API — if 402, agent auto-swaps BTC to USDC and pays
+cash fetch https://search.reversesandbox.com/web/search?q=bitcoin
+
+# Output is the API response (JSON or text)
 ```
 
 Common workflow for monitoring a stablecoin swap:

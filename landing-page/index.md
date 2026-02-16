@@ -1,4 +1,4 @@
-# Claw Cash — Human-to-Agent Payments
+# 🦞 Claw Cash — Human-to-Agent Payments
 
 > Stablecoins in. Bitcoin out. Money agents can trust, and verify.
 

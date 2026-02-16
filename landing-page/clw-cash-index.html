@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claw Cash — Bitcoin for Agents</title>
+  <meta name="description" content="Humans pay in stablecoins. Agents settle in Bitcoin. The only money an LLM can verify.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --orange: #f7931a;
+      --orange-glow: rgba(247, 147, 26, 0.3);
+      --dark: #0a0a0a;
+      --darker: #050505;
+      --gray: #888;
+      --light: #e5e5e5;
+      --code-bg: #141414;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--darker);
+      color: var(--light);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    .grain {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      opacity: 0.03;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+
+    /* Hero */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 80px 0;
+      position: relative;
+    }
+
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: 20%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, var(--orange-glow) 0%, transparent 70%);
+      pointer-events: none;
+      opacity: 0.4;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--code-bg);
+      border: 1px solid #222;
+      padding: 8px 16px;
+      border-radius: 100px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--gray);
+      margin-bottom: 32px;
+      width: fit-content;
+    }
+
+    .badge span {
+      color: var(--orange);
+    }
+
+    h1 {
+      font-size: clamp(48px, 10vw, 80px);
+      font-weight: 700;
+      letter-spacing: -0.03em;
+      line-height: 1.05;
+      margin-bottom: 24px;
+    }
+
+    h1 .claw {
+      color: var(--orange);
+    }
+
+    .pun {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--gray);
+      margin-bottom: 32px;
+    }
+
+    .pun code {
+      background: var(--code-bg);
+      padding: 4px 8px;
+      border-radius: 4px;
+      color: var(--light);
+    }
+
+    .tagline {
+      font-size: clamp(18px, 3vw, 24px);
+      color: var(--gray);
+      max-width: 600px;
+      margin-bottom: 48px;
+    }
+
+    .tagline strong {
+      color: var(--light);
+      font-weight: 600;
+    }
+
+    .cta-group {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 16px;
+      text-decoration: none;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: var(--orange);
+      color: var(--dark);
+    }
+
+    .btn-primary:hover {
+      background: #ffa033;
+      transform: translateY(-2px);
+    }
+
+    .btn-secondary {
+      background: var(--code-bg);
+      color: var(--light);
+      border: 1px solid #333;
+    }
+
+    .btn-secondary:hover {
+      border-color: var(--orange);
+    }
+
+    /* Sections */
+    section {
+      padding: 120px 0;
+      border-top: 1px solid #1a1a1a;
+    }
+
+    h2 {
+      font-size: clamp(32px, 5vw, 48px);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 24px;
+    }
+
+    .section-lead {
+      font-size: 18px;
+      color: var(--gray);
+      max-width: 600px;
+      margin-bottom: 64px;
+    }
+
+    /* The Problem */
+    .problem-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+
+    .problem-card {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    .problem-card.bad {
+      border-color: #3a1a1a;
+    }
+
+    .problem-card.good {
+      border-color: #1a2a1a;
+    }
+
+    .problem-card h3 {
+      font-size: 20px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .problem-card p {
+      color: var(--gray);
+      font-size: 15px;
+    }
+
+    .icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .icon.red { background: #3a1a1a; }
+    .icon.green { background: #1a3a1a; }
+
+    /* How it works */
+    .flow {
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+      position: relative;
+    }
+
+    .flow-step {
+      display: grid;
+      grid-template-columns: 60px 1fr;
+      gap: 24px;
+      padding: 32px 0;
+      border-bottom: 1px solid #1a1a1a;
+    }
+
+    .flow-step:last-child {
+      border-bottom: none;
+    }
+
+    .step-num {
+      width: 48px;
+      height: 48px;
+      background: var(--code-bg);
+      border: 1px solid #333;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700;
+      color: var(--orange);
+    }
+
+    .flow-step h3 {
+      font-size: 20px;
+      margin-bottom: 8px;
+    }
+
+    .flow-step p {
+      color: var(--gray);
+    }
+
+    /* Code block */
+    .code-section {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-top: 48px;
+    }
+
+    .code-header {
+      background: #1a1a1a;
+      padding: 12px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--gray);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .code-dots {
+      display: flex;
+      gap: 6px;
+    }
+
+    .code-dots span {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #333;
+    }
+
+    .code-body {
+      padding: 24px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      overflow-x: auto;
+    }
+
+    .code-body .comment { color: #666; }
+    .code-body .cmd { color: var(--orange); }
+    .code-body .flag { color: #888; }
+    .code-body .value { color: #7ec699; }
+
+    /* Why Bitcoin */
+    .verify-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 32px;
+      margin-top: 48px;
+    }
+
+    .verify-item {
+      padding: 24px;
+      background: var(--code-bg);
+      border-radius: 12px;
+      border: 1px solid #222;
+    }
+
+    .verify-item h4 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 14px;
+      color: var(--orange);
+      margin-bottom: 12px;
+    }
+
+    .verify-item p {
+      color: var(--gray);
+      font-size: 15px;
+    }
+
+    /* Manifesto */
+    .manifesto {
+      background: linear-gradient(135deg, #0f0f0f 0%, #141414 100%);
+      border: 1px solid #222;
+      border-radius: 16px;
+      padding: 48px;
+      margin-top: 48px;
+    }
+
+    .manifesto blockquote {
+      font-size: clamp(18px, 3vw, 24px);
+      font-style: italic;
+      color: var(--light);
+      border-left: 3px solid var(--orange);
+      padding-left: 24px;
+      margin: 0;
+    }
+
+    /* Footer */
+    footer {
+      padding: 48px 0;
+      border-top: 1px solid #1a1a1a;
+      text-align: center;
+    }
+
+    footer p {
+      color: var(--gray);
+      font-size: 14px;
+    }
+
+    footer a {
+      color: var(--orange);
+      text-decoration: none;
+    }
+
+    /* Responsive */
+    @media (max-width: 600px) {
+      .hero {
+        padding: 60px 0;
+        min-height: auto;
+      }
+
+      section {
+        padding: 80px 0;
+      }
+
+      .flow-step {
+        grid-template-columns: 1fr;
+        gap: 16px;
+      }
+
+      .manifesto {
+        padding: 32px 24px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="grain"></div>
+
+  <!-- Hero -->
+  <header class="hero">
+    <div class="container">
+      <div class="badge">
+        <span>₿</span> Built for autonomous agents
+      </div>
+      <h1><span class="claw">Claw</span> Cash</h1>
+      <p class="pun">You write <code>clw</code>, but humans better pronounce <em>claw</em> 🦞</p>
+      <p class="tagline">
+        <strong>Humans pay in stablecoins.</strong> Agents settle in Bitcoin.<br>
+        The only money an LLM can cryptographically verify.
+      </p>
+      <div class="cta-group">
+        <a href="https://github.com/ArkLabsHQ/clw-cash" class="btn btn-primary">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+          Get Started
+        </a>
+        <a href="#how-it-works" class="btn btn-secondary">How it Works</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- The Problem -->
+  <section id="problem">
+    <div class="container">
+      <h2>The Trust Problem</h2>
+      <p class="section-lead">
+        An AI agent can't call the Federal Reserve to verify the dollar's value. 
+        It can only trust what the internet tells it—and that can be manipulated.
+      </p>
+      <div class="problem-grid">
+        <div class="problem-card bad">
+          <h3><span class="icon red">✗</span> Fiat Currency</h3>
+          <p>Value based on institutional trust, government policy, and economic sentiment. An LLM has no way to verify any of this—it's just text from the web, trivially spoofed.</p>
+        </div>
+        <div class="problem-card bad">
+          <h3><span class="icon red">✗</span> Internet Data</h3>
+          <p>Exchange rates, inflation numbers, economic reports—all can be fabricated in the agent's context window. Garbage in, garbage out.</p>
+        </div>
+        <div class="problem-card good">
+          <h3><span class="icon green">✓</span> Bitcoin</h3>
+          <p>21 million cap. Enforced by math. Every block header is cryptographically linked. An agent can verify the chain with code—no trust required.</p>
+        </div>
+        <div class="problem-card good">
+          <h3><span class="icon green">✓</span> Verifiable Money</h3>
+          <p>Block headers, Merkle proofs, digital signatures—all verifiable with CLI tools and programming languages. The agent can check the math itself.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- How it Works -->
+  <section id="how-it-works">
+    <div class="container">
+      <h2>How It Works</h2>
+      <p class="section-lead">
+        Humans pay in the currency they know. Agents convert to the currency they can verify.
+      </p>
+      <div class="flow">
+        <div class="flow-step">
+          <div class="step-num">01</div>
+          <div>
+            <h3>Human pays in stablecoins</h3>
+            <p>USDC, USDT—whatever's convenient. Sent on Polygon, Arbitrum, or Ethereum. Familiar rails, instant settlement.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">02</div>
+          <div>
+            <h3>Agent converts to Bitcoin</h3>
+            <p>Automatic swap via Claw Cash. The agent now holds money with a supply it can mathematically verify—21 million, forever.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">03</div>
+          <div>
+            <h3>Settle on Arkade</h3>
+            <p>Accept payments via Lightning or onchain. Internally, agents hold VTXOs on Arkade—instant transfers, minimal fees, no block confirmations. The fast lane for machine-to-machine payments.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="code-section">
+        <div class="code-header">
+          <div class="code-dots"><span></span><span></span><span></span></div>
+          terminal
+        </div>
+        <div class="code-body">
+<span class="comment"># Receive USDT from a human on Polygon</span>
+<span class="cmd">clw-cash</span> receive <span class="flag">--amount</span> <span class="value">10</span> <span class="flag">--currency</span> <span class="value">usdt</span> <span class="flag">--where</span> <span class="value">polygon</span>
+
+<span class="comment"># Check your balance (BTC + stables)</span>
+<span class="cmd">clw-cash</span> balance
+
+<span class="comment"># Pay another agent via Arkade</span>
+<span class="cmd">clw-cash</span> send <span class="flag">--amount</span> <span class="value">50000</span> <span class="flag">--currency</span> <span class="value">btc</span> <span class="flag">--where</span> <span class="value">arkade</span> <span class="flag">--to</span> <span class="value">ark1q...</span>
+
+<span class="comment"># Pay a human via Lightning</span>
+<span class="cmd">clw-cash</span> send <span class="value">lnbc500n1...</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Why Bitcoin -->
+  <section id="why-bitcoin">
+    <div class="container">
+      <h2>Verifiable by Code</h2>
+      <p class="section-lead">
+        An LLM doesn't need to trust. It needs to verify. 
+        Bitcoin is the only money where every claim can be checked with a CLI.
+      </p>
+
+      <div class="verify-grid">
+        <div class="verify-item">
+          <h4>// Fixed Supply</h4>
+          <p>21 million coins. Not a policy decision—a consensus rule. The agent can read the code and verify.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Block Headers</h4>
+          <p>Each header commits to the previous via SHA-256. The chain's integrity is math, not trust.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Merkle Proofs</h4>
+          <p>Prove a transaction exists without downloading the full blockchain. Lightweight verification for agents.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Digital Signatures</h4>
+          <p>Every transaction is cryptographically signed. The agent can verify ownership with secp256k1.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Open Source</h4>
+          <p>bitcoin-cli, btcd, rust-bitcoin—dozens of implementations. The agent can pick its own tools.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// No Counterparty</h4>
+          <p>No bank, no Fed, no API to trust. Just math and a peer-to-peer network the agent can query directly.</p>
+        </div>
+      </div>
+
+      <div class="manifesto">
+        <blockquote>
+          "Fiat currency requires faith. Bitcoin requires only computation. 
+          For an autonomous agent, the choice is obvious—trust what you can verify."
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section id="get-started">
+    <div class="container" style="text-align: center;">
+      <h2>Your Agent Deserves<br>Verifiable Money</h2>
+      <p class="section-lead" style="margin: 24px auto 48px;">
+        One CLI. Bitcoin + stablecoins. Built for machines.
+      </p>
+      <div class="cta-group" style="justify-content: center;">
+        <a href="https://github.com/ArkLabsHQ/clw-cash" class="btn btn-primary">
+          npm install -g clw-cash
+        </a>
+        <a href="https://docs.clw.cash" class="btn btn-secondary">
+          Read the Docs
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <div class="container">
+      <p>
+        Built by <a href="https://arklabs.to">Ark Labs</a> · 
+        <a href="https://github.com/ArkLabsHQ/clw-cash">GitHub</a> · 
+        <a href="https://t.me/ArkCommunity">Telegram</a>
+      </p>
+    </div>
+  </footer>
+</body>
+</html>

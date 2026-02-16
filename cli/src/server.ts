@@ -2,6 +2,7 @@ import { createServer, type Server, type IncomingMessage } from "node:http";
 import type { CashContext } from "./context.js";
 import type { SwapMonitor } from "./monitor.js";
 import type { AuthMonitor } from "./authMonitor.js";
+import type { WebhookRegistry, SwapEventType } from "./notifier.js";
 import type { EvmChain, StablecoinToken, StablecoinSwapInfo, StablecoinSwapStatus } from "@clw-cash/skills";
 
 const LENDASWAP_API = "https://apilendaswap.lendasat.com";
@@ -54,6 +55,7 @@ export interface DaemonServerOpts {
   ctx: CashContext;
   monitor: SwapMonitor;
   authMonitor: AuthMonitor;
+  webhookRegistry: WebhookRegistry;
 }
 
 async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> {
@@ -71,7 +73,7 @@ async function readBody(req: IncomingMessage): Promise<Record<string, unknown>> 
 }
 
 export function createDaemonServer(opts: DaemonServerOpts): Server {
-  const { ctx, monitor, authMonitor } = opts;
+  const { ctx, monitor, authMonitor, webhookRegistry } = opts;
   const startTime = Date.now();
 
   const server = createServer(async (req, res) => {
@@ -312,6 +314,41 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
       // GET /auth/status — check if auth is still polling or resolved
       if (method === "GET" && url.pathname === "/auth/status") {
         return json(res, 200, authMonitor.getStatus());
+      }
+
+      // POST /notify/register — register a webhook for swap events
+      if (method === "POST" && url.pathname === "/notify/register") {
+        const body = await readBody(req);
+        const webhookUrl = body.url as string;
+        const events = body.events as SwapEventType[];
+
+        if (!webhookUrl || !events || !Array.isArray(events)) {
+          return json(res, 400, { error: "Missing url or events array" });
+        }
+
+        try {
+          const reg = webhookRegistry.register(webhookUrl, events);
+          return json(res, 200, reg);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          return json(res, 400, { error: message });
+        }
+      }
+
+      // DELETE /notify/:id — unregister a webhook
+      if (method === "DELETE" && url.pathname.startsWith("/notify/") && url.pathname.split("/").length === 3) {
+        const id = url.pathname.split("/")[2];
+        if (!id) {
+          return json(res, 400, { error: "Missing webhook ID" });
+        }
+
+        const removed = webhookRegistry.unregister(id);
+        return json(res, 200, { removed });
+      }
+
+      // GET /notify — list active webhook registrations
+      if (method === "GET" && url.pathname === "/notify") {
+        return json(res, 200, { webhooks: webhookRegistry.list() });
       }
 
       return json(res, 404, { error: "Not found" });

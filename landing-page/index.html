@@ -371,6 +371,109 @@
     .code-body .flag { color: #888; }
     .code-body .value { color: #7ec699; }
 
+    /* Payment Links */
+    .payment-grid {
+      display: flex;
+      justify-content: center;
+      margin-top: 48px;
+    }
+
+    .payment-preview {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    .payment-preview-header {
+      background: #1a1a1a;
+      padding: 12px 20px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      color: var(--gray);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .payment-preview-url {
+      background: #0f0f0f;
+      padding: 4px 12px;
+      border-radius: 6px;
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .payment-preview iframe {
+      width: 100%;
+      height: 600px;
+      border: none;
+      background: #0a0a0a;
+    }
+
+    .payment-label {
+      padding: 16px 20px;
+      font-size: 14px;
+      color: var(--gray);
+      border-top: 1px solid #222;
+    }
+
+    .payment-label strong {
+      color: var(--light);
+    }
+
+    .payment-preview {
+      width: 100%;
+    }
+
+    @media (max-width: 768px) {
+      .payment-preview iframe {
+        height: 500px;
+      }
+    }
+
+    /* Use Cases */
+    .usecase-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 24px;
+      margin-top: 48px;
+    }
+
+    .usecase-card {
+      background: var(--code-bg);
+      border: 1px solid #222;
+      border-radius: 12px;
+      padding: 32px;
+    }
+
+    .usecase-card h3 {
+      font-size: 18px;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .usecase-card h3 span {
+      font-size: 24px;
+    }
+
+    .usecase-card p {
+      color: var(--gray);
+      font-size: 15px;
+    }
+
+    .usecase-card .example {
+      margin-top: 12px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: #666;
+      font-style: italic;
+    }
+
     /* Why Bitcoin */
     .verify-grid {
       display: grid;
@@ -561,6 +664,50 @@
     </div>
   </section>
 
+  <!-- Payment Links -->
+  <section id="payment-links">
+    <div class="container">
+      <h2>Payment Links</h2>
+      <p class="section-lead">
+        Agents generate payment links. Humans pay with their wallet. No app downloads, no sign-ups—just connect and send.
+      </p>
+      <div class="payment-grid">
+        <div class="payment-preview">
+          <div class="payment-preview-header">
+            <div class="code-dots"><span></span><span></span><span></span></div>
+            <div class="payment-preview-url">pay.clw.cash</div>
+          </div>
+          <iframe src="https://pay.clw.cash/?id=24a8665a-6eb7-4bce-ada1-b9d4f3e66941" loading="lazy"></iframe>
+          <div class="payment-label"><strong>Pay request</strong> — human connects wallet and sends stablecoins</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Use Cases -->
+  <section id="use-cases">
+    <div class="container">
+      <h2>Agents That Earn.<br>Agents That Spend.</h2>
+      <p class="section-lead">
+        Agents need money to operate. Claw Cash gives them a wallet they can actually use.
+      </p>
+      <div class="usecase-grid">
+        <div class="usecase-card">
+          <h3><span>⚡</span> Pay for Compute</h3>
+          <p>Agents pay for their own inference, cloud functions, and hosting. LLM APIs, VPS, storage—settle in sats, no credit card required.</p>
+        </div>
+        <div class="usecase-card">
+          <h3><span>🤖</span> Pay Other Agents</h3>
+          <p>Agents hire other agents. Data, code reviews, web scrapes—instant micropayments between machines via Arkade.</p>
+        </div>
+        <div class="usecase-card">
+          <h3><span>💰</span> Earn Revenue</h3>
+          <p>Your agent offers a service and gets paid by humans in stablecoins. It converts to Bitcoin and holds verifiable money.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- Why Bitcoin -->
   <section id="why-bitcoin">
     <div class="container">
@@ -628,7 +775,7 @@
     <div class="container">
       <p>
         Built by <a href="https://github.com/tiero">tiero</a> ·
-        Powered by <a href="https://arkadeos.com">Arkade</a> ·
+        Powered by <a href="https://arkadeos.com">👾 Arkade</a> ·
         <a href="https://t.me/arkade_os">Telegram</a>
       </p>
     </div>

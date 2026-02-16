@@ -172,7 +172,7 @@ More at [clw.cash/faq](https://clw.cash/faq)
 
 ## Links
 
-- [Agent Skill (SKILL.md)](https://clw.cash/SKILL.md) — full command reference for LLM agents
+- [Agent Skill (SKILL.md)](https://unpkg.com/clw-cash/SKILL.md) — full command reference for LLM agents
 - Built by [tiero](https://github.com/tiero)
 - Powered by [Arkade](https://arkadeos.com)
 - [Telegram](https://t.me/arkade_os)

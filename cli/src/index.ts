@@ -26,6 +26,7 @@ Usage:
   cash balance
   cash init --api-url <url> --token <jwt> --ark-server <url>
   cash login                  Re-authenticate via Telegram (refresh token)
+  cash skill                  Print SKILL.md (agent instructions)
   cash config                 Show resolved configuration and sources
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
@@ -102,6 +103,15 @@ async function main() {
       case "login":
         await handleLogin(argv);
         return;
+      case "skill": {
+        const { readFileSync } = await import("node:fs");
+        const { join, dirname } = await import("node:path");
+        const { fileURLToPath } = await import("node:url");
+        const __dirname = dirname(fileURLToPath(import.meta.url));
+        const skillPath = join(__dirname, "..", "SKILL.md");
+        process.stdout.write(readFileSync(skillPath, "utf-8"));
+        return;
+      }
       case "config":
         await handleConfig();
         return;

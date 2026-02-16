@@ -1,6 +1,6 @@
-# Claw Cash — Bitcoin for Agents
+# Claw Cash — Human-to-Agent Payments
 
-> Humans pay in stablecoins. Agents settle in Bitcoin. The only money an LLM can cryptographically verify.
+> Stablecoins in. Bitcoin out. Money agents can trust, and verify.
 
 ## Get Started
 

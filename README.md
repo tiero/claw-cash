@@ -4,6 +4,12 @@ Privy, for AI Agents.
 
 Secure identity infrastructure that lets AI agents hold, sign, and transact with Bitcoin and stablecoins. Private keys live inside hardware enclaves — your agent gets a simple CLI, never touches the raw key material.
 
+## Vision: Agents Hold Sats, Pay the World
+
+Agents accumulate and hold Bitcoin (sats). When they need to pay for something — an API behind a paywall, a stablecoin transfer, an x402-protected resource — they swap BTC to stablecoins on the fly and send. The agent never needs to hold stablecoins as a reserve; Bitcoin is the treasury, stablecoins are the payment rail.
+
+This means clw.cash is **x402-compatible by design**. When an agent hits a `402 Payment Required` response demanding USDC on Polygon, it already has everything it needs: `cash send --amount 10 --currency usdc --where polygon --to <address>` swaps BTC→USDC atomically and delivers the payment. The swap infrastructure (LendaSwap + Boltz) handles the cross-chain bridge. The agent just says "pay X in currency Y" and it works.
+
 ## How it works
 
 ```
@@ -209,9 +215,19 @@ ev enclave build -v --output . -c ./infra/enclave.toml ./enclave
 ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 ```
 
-## TODO
+## Roadmap
 
-- [ ] MCP server for Claude Code / Claude Desktop tool-use integration
-- [ ] Spending policies — per-agent limits, allowlists, time-based rules
-- [ ] Persistent storage (replace in-memory store with PostgreSQL)
-- [ ] Webhook notifications for transaction events
+### Now
+
+- [ ] **x402 client support** — detect `402 Payment Required`, parse payment requirements, auto-swap BTC→stablecoin, retry with proof
+- [ ] **MCP server** — Claude Code / Claude Desktop tool-use integration
+
+### Next
+
+- [ ] **Spending policies** — per-agent limits, allowlists, time-based rules, enforced at enclave level
+- [ ] **More auth providers** — Slack, Google, 1Password, YubiKey, Passkeys
+
+### Later
+
+- [ ] **Persistent storage** — replace in-memory store with PostgreSQL
+- [ ] **Webhook notifications** — push events for transaction completion, swap settlement, balance changes

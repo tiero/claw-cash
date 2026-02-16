@@ -21,11 +21,12 @@ npx wrangler d1 create clw-cash-db
 ### 2. Create KV Namespaces
 
 ```bash
-npx wrangler kv namespace create KV_CHALLENGES
 npx wrangler kv namespace create KV_TICKETS
 npx wrangler kv namespace create KV_RATE_LIMIT
 # Copy the IDs into wrangler.toml (both default and env.production sections)
 ```
+
+> **Note:** Challenges are stored in D1 (not KV) for strong consistency during the auth flow.
 
 ### 3. Run D1 Migrations
 

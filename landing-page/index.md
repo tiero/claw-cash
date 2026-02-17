@@ -160,6 +160,7 @@ Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immedia
 
 ## Links
 
+- [GitHub](https://github.com/tiero/clw.cash)
 - [Agent Skill (SKILL.md)](https://unpkg.com/clw-cash/SKILL.md) — full command reference for LLM agents
 - Powered by [Arkade](https://arkadeos.com)
 - [Telegram](https://t.me/arkade_os)

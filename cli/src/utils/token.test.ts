@@ -68,15 +68,17 @@ describe("parseBtcAmount", () => {
     assert.equal(parseBtcAmount("1", "sats"), 1);
   });
 
-  it("currency=btc treats amount as BTC and converts to sats", () => {
-    assert.equal(parseBtcAmount("1", "btc"), 100_000_000);
-    assert.equal(parseBtcAmount("0.001", "btc"), 100_000);
-    assert.equal(parseBtcAmount("0.00000001", "btc"), 1);
-    assert.equal(parseBtcAmount("21000000", "btc"), 2_100_000_000_000_000);
+  it("currency=btc treats amount as satoshis (same as sats)", () => {
+    assert.equal(parseBtcAmount("421", "btc"), 421);
+    assert.equal(parseBtcAmount("100000", "btc"), 100_000);
+    assert.equal(parseBtcAmount("1", "btc"), 1);
+    assert.equal(parseBtcAmount("1000", "btc"), 1000);
   });
 
-  it("currency=btc with amount 421 returns 42.1B sats", () => {
-    assert.equal(parseBtcAmount("421", "btc"), 42_100_000_000);
+  it("rejects amounts exceeding max supply", () => {
+    const maxSats = 21_000_000 * 1e8;
+    assert.equal(parseBtcAmount(String(maxSats), "btc"), maxSats);
+    assert.equal(parseBtcAmount(String(maxSats + 1), "btc"), null);
   });
 
   it("rejects invalid amounts", () => {
@@ -86,6 +88,7 @@ describe("parseBtcAmount", () => {
     assert.equal(parseBtcAmount("0", "btc"), null);
     assert.equal(parseBtcAmount("-1", "btc"), null);
     assert.equal(parseBtcAmount("abc", "btc"), null);
+    assert.equal(parseBtcAmount("1.5", "btc"), null); // fractional sats not allowed
   });
 });
 

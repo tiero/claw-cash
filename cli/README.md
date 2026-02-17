@@ -21,11 +21,11 @@ cash login
 cash balance
 
 # Send funds
-cash send --amount 100000 --currency btc --where arkade --to ark1q...
+cash send --amount 100000 --currency sats --where arkade --to ark1q...
 cash send lnbc500n1...
 
 # Receive funds
-cash receive --amount 100000 --currency btc --where lightning
+cash receive --amount 100000 --currency sats --where lightning
 ```
 
 ## Commands
@@ -47,7 +47,7 @@ cash receive --amount 100000 --currency btc --where lightning
 
 ### Supported currencies and networks
 
-- **Currency:** `btc`, `usdt`, `usdc`
+- **Currency:** `btc`, `sats`, `usdt`, `usdc`
 - **Where:** `onchain`, `lightning`, `arkade`, `polygon`, `arbitrum`, `ethereum`
 
 ## How It Works

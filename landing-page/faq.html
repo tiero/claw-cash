@@ -45,9 +45,9 @@
           </div>
         </details>
         <details class="faq-item">
-          <summary>How does x402 payment work?</summary>
+          <summary>Is x402 payment supported?</summary>
           <div class="faq-answer">
-            When an agent hits an API that returns <code>402 Payment Required</code>, Claw Cash will read the payment requirements (amount, token, chain, address), swap BTC to the requested stablecoin on the fly, sign the x402 payment authorization, and retry the original request. The agent holds sats as its treasury and pays in whatever currency the API demands. This feature requires ECDSA signing in the enclave — tracked in <a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>.
+            Not yet. x402 is on the roadmap but blocked on two fronts: ECDSA signing in the enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>) and the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support <code>cash pay &lt;url&gt;</code> with automatic BTC→stablecoin swaps.
           </div>
         </details>
         <details class="faq-item">

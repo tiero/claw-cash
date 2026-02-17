@@ -85,6 +85,7 @@ describe("parseBtcAmount", () => {
     assert.equal(parseBtcAmount("0", "sats"), null);
     assert.equal(parseBtcAmount("-5", "sats"), null);
     assert.equal(parseBtcAmount("abc", "sats"), null);
+    assert.equal(parseBtcAmount("1.5", "sats"), null); // fractional sats not allowed
     assert.equal(parseBtcAmount("0", "btc"), null);
     assert.equal(parseBtcAmount("-1", "btc"), null);
     assert.equal(parseBtcAmount("abc", "btc"), null);

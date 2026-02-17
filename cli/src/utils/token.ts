@@ -34,11 +34,11 @@ const MAX_SATS = 21_000_000 * 1e8; // 21M BTC in sats
 /** Parse a BTC/sats amount string to satoshis. Both "btc" and "sats" amounts are in satoshis. */
 export function parseBtcAmount(amountStr: string, currency: Currency): number | null {
   // Both btc and sats currency treat amount as satoshis
-  // Reject non-integer inputs (e.g., "1.5")
+  // Reject non-integer inputs (e.g., "1.5", "abc", leading zeros)
   if (!/^\d+$/.test(amountStr)) return null;
+  
   const sats = parseInt(amountStr, 10);
-  if (isNaN(sats) || sats <= 0) return null;
-  if (sats > MAX_SATS) return null;
+  if (sats <= 0 || sats > MAX_SATS) return null;
   return sats;
 }
 

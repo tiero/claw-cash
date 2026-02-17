@@ -72,9 +72,9 @@ SEALING_KEY=${sealing_key}
 
 # CF Worker (api) only
 SESSION_SIGNING_SECRET=${session_secret}
-EV_API_KEY=${existing_ev_api_key}
-TELEGRAM_BOT_TOKEN=${existing_telegram_bot_token}
-TELEGRAM_BOT_USERNAME=${existing_telegram_bot_username}
+EV_API_KEY="${existing_ev_api_key}"
+TELEGRAM_BOT_TOKEN="${existing_telegram_bot_token}"
+TELEGRAM_BOT_USERNAME="${existing_telegram_bot_username}"
 EOF
 
   chmod 600 "$ENV_FILE"
@@ -91,13 +91,22 @@ EOF
 deploy_enclave() {
   info "Deploying enclave..."
   load_env
+  require_var EV_API_KEY
   require_var TICKET_SIGNING_SECRET
   require_var INTERNAL_API_KEY
   require_var SEALING_KEY
 
-  # Deploy (builds Docker image + pushes to Evervault)
-  info "Building and deploying enclave image..."
-  ev enclave deploy --config "$ROOT_DIR/enclave.toml"
+  # ev CLI needs these in the environment
+  export EV_API_KEY
+  export EV_APP_UUID="app_366535fdf2b7"
+
+  # Build EIF (Docker context is the enclave/ directory)
+  info "Building enclave image..."
+  ev enclave build -v --output "$ROOT_DIR" -c "$ROOT_DIR/infra/enclave.toml" "$ROOT_DIR/enclave"
+
+  # Deploy the built EIF
+  info "Deploying enclave image..."
+  ev enclave deploy --eif-path "$ROOT_DIR/enclave.eif" -c "$ROOT_DIR/infra/enclave.toml"
 
   # Set env vars (secrets)
   info "Setting enclave environment variables..."
@@ -105,7 +114,7 @@ deploy_enclave() {
   for var in "${enclave_secrets[@]}"; do
     info "  Setting $var..."
     ev enclave env add \
-      --config "$ROOT_DIR/enclave.toml" \
+      -c "$ROOT_DIR/infra/enclave.toml" \
       --key "$var" \
       --value "${!var}" \
       --secret
@@ -113,10 +122,10 @@ deploy_enclave() {
 
   # Restart to pick up new env vars
   info "Restarting enclave..."
-  ev enclave restart --config "$ROOT_DIR/enclave.toml"
+  ev enclave restart -c "$ROOT_DIR/infra/enclave.toml"
 
   warn "Remember to update PCR values in infra/enclave.toml if the image changed."
-  warn "Run: ev enclave describe --config enclave.toml --json | jq '.attestation'"
+  warn "Run: ev enclave describe ./enclave.eif --json | jq '.attestation'"
   info "Enclave deploy complete!"
 }
 

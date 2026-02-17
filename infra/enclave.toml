@@ -3,7 +3,7 @@ name = "clw-cash-signer"
 uuid = "enclave_dc9a8ad33667"
 app_uuid = "app_366535fdf2b7"
 team_uuid = "team_e48a089e94da"
-debug = true
+debug = false
 dockerfile = "./enclave/Dockerfile"
 api_key_auth = true
 trx_logging = true
@@ -30,7 +30,7 @@ keyPath = "./infra/key.pem"
 
 [attestation]
 HashAlgorithm = "Sha384 { ... }"
-PCR0 = "1509b13e2c05f62ce49d1e54cc3d3c1e12d35cfbbefd37be5e27a7c70d5dd9098408302bd20f938a3f5eaaa4a30b8ec1"
+PCR0 = "7c484f4594d88803732f82ceb5e0e47bda492b7ac43f48b2ba64b859d23ee2a21ba0afb89d6ed4c5e79a611d258a8088"
 PCR1 = "0343b056cd8485ca7890ddd833476d78460aed2aa161548e4e26bedf321726696257d623e8805f3f605946b3d8b0c6aa"
-PCR2 = "7b9c3e2068121bab856490ef8ac07dc7a17937b2ee3e0c4b2757b79d2932fba61a4ef7aa6d7a7c3bb188fc6a19bed3dc"
+PCR2 = "3a57e3dd498df7e1d86f8924f563f7d2644623d72e5fc815a049a183e6275497b5acac2a8f2e0d25e9fcd77531519b5c"
 PCR8 = "ab2fb6f40392d68b8ebb4d6e97dfb46d04101de4a54312320f8d1de707203390b03cb0f0ee4b29fdd5a94f0fa34ec1d3"

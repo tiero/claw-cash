@@ -1,14 +1,16 @@
 # clw.cash
 
-Privy, for AI Agents.
+Bitcoin for AI Agents.
 
-Secure identity infrastructure that lets AI agents hold, sign, and transact with Bitcoin and stablecoins. Private keys live inside hardware enclaves — your agent gets a simple CLI, never touches the raw key material.
+Agents hold Bitcoin — the only money they can cryptographically verify. When they need to pay for something (APIs, stablecoins, inference), they swap BTC on the fly. Private keys live in hardware enclaves. One CLI for BTC, Lightning, Ark, and stablecoins.
 
-## Vision: Agents Hold Sats, Pay the World
+## Vision: Stablecoins In, Bitcoin Out
 
-Agents accumulate and hold Bitcoin (sats). When they need to pay for something — an API behind a paywall, a stablecoin transfer, an x402-protected resource — they swap BTC to stablecoins on the fly and send. The agent never needs to hold stablecoins as a reserve; Bitcoin is the treasury, stablecoins are the payment rail.
+Humans pay agents in stablecoins — USDC, USDT, whatever's convenient. The agent converts to Bitcoin and holds verifiable money: 21 million supply cap enforced by math, every block header cryptographically linked, every transaction independently verifiable by code.
 
-The architectural goal is **native x402 support**: when an agent hits a `402 Payment Required` response demanding USDC, it should swap BTC→stablecoins on the fly and deliver the payment automatically. The swap infrastructure (LendaSwap + Boltz) and ECDSA signing are already in place — what's missing is x402 facilitator support beyond Base USDC. This is on the roadmap.
+When an agent needs to spend — an API behind a paywall, a stablecoin transfer, an x402-protected resource — it swaps BTC to stablecoins on the fly and sends. Bitcoin is the treasury, stablecoins are the payment rail.
+
+The swap infrastructure (LendaSwap + Boltz) and ECDSA signing are already in place. Native x402 support is on the roadmap — blocked on x402 facilitator support beyond Base USDC.
 
 ## How it works
 
@@ -223,7 +225,7 @@ ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 
 ### Next
 
-- [ ] **x402 client support** — `cash pay <url>` command, auto-swap BTC→stablecoin, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5)) and x402 facilitators outside USDC on Base
+- [ ] **x402 client support** — `cash pay <url>` command, auto-swap BTC→stablecoin, retry with proof. Blocked on x402 facilitators outside USDC on Base
 - [ ] **Spending policies** — per-agent limits, allowlists, time-based rules, enforced at enclave level
 - [ ] **More auth providers** — Slack, Google, 1Password, YubiKey, Passkeys
 

@@ -130,7 +130,7 @@ Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy c
 
 ### NEXT
 
-- **x402 Client Support** — `cash pay <url>` command. Detect `402 Payment Required`, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5)) and x402 facilitators outside USDC on Base.
+- **x402 Client Support** — `cash pay <url>` command. Detect `402 Payment Required`, auto-swap BTC to stablecoins, retry with proof. Blocked on x402 facilitators outside USDC on Base.
 - **Spending Policies** — Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.
 - **More Auth Providers** — Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.
 
@@ -144,7 +144,7 @@ Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy c
 Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
 
 **Is x402 payment supported?**
-Not yet. x402 is on the roadmap but blocked on two fronts: ECDSA signing in the enclave ([#5](https://github.com/tiero/clw.cash/issues/5)) and the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support `cash pay <url>` with automatic BTC→stablecoin swaps.
+Not yet. x402 is on the roadmap but blocked on the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support `cash pay <url>` with automatic BTC→stablecoin swaps.
 
 **Where are the private keys stored?**
 Inside an AWS Nitro Enclave — a hardware-isolated VM with no persistent storage, no shell access. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel.

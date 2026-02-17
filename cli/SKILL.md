@@ -13,22 +13,71 @@ Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = 
 - **Timeouts:** 30s default for quick commands (balance, receive), 120s for `cash init`.
 - **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
 
-### Reactive Polling
+### Reactive Behavior (Login → Payment Detection)
 
-For long-running operations (swaps, pending receives), keep the user informed:
+The agent must stay reactive at every stage. Never block silently. Every operation >5s gets a status update.
 
-- **Run in background with short yield** — don't block the conversation for >15s without an update. Use `yieldMs=5000` or `background=true` for swap commands.
-- **Stream progress** — relay status lines as they appear:
-  - "Executing swap BTC → USDC..."
-  - "Waiting for on-chain confirmation..."
-  - "Swap claimed! New balance: X sats"
-- **Poll with `process action=log`** — if a command is backgrounded, check its output periodically and report the latest status line to the user.
-- **Timeout strategy:**
-  - Quick commands (balance, receive, config): 30s
-  - Swaps/settlements: start with `yieldMs=10000`, then poll process log
-  - If still running after 60s, tell user "still processing, I'll let you know when done"
-- **Never go silent** for >15s during a long operation. Always provide a status update.
-- **Never let a timeout kill a command silently** — if a command times out, tell the user what happened and suggest next steps (e.g., `cash swap <id>` to check status).
+#### 1. Login & Init
+
+- Run `cash init` with 120s timeout — it waits for Telegram 2FA.
+- **Immediately tell the user** what's happening: "Authenticating — check Telegram for the login link."
+- Poll every 10s. Relay progress: "Still waiting for Telegram confirmation..."
+- On success: "Logged in! Checking your balance..." → auto-run `cash balance`.
+- On failure/timeout: "Login timed out. Run `cash login` to try again."
+- For bot mode (`--start`): return the deep link immediately, then register a webhook or poll `cash status` every 10s until session becomes active.
+
+#### 2. Balance & Config (Quick Reads)
+
+- 30s timeout max. These should return instantly.
+- On success: report the balance clearly — "You have 50,000 sats available (70,000 total with pending)."
+- On error: check session first — if expired, tell user "Session expired, re-authenticating..." and run `cash login`.
+
+#### 3. Receiving — Waiting for Payment
+
+This is the most important reactive flow. After generating an address/invoice:
+
+- **Show the address/invoice/payment URL immediately** — don't wait.
+- **Start polling for incoming payment:**
+  1. Run `cash balance` every 15-30s to detect balance changes.
+  2. For Lightning: the daemon auto-claims — poll `cash status` or register a webhook.
+  3. For stablecoin receives: poll `cash swaps --pending` to detect when the sender funds the swap.
+- **Keep the user informed:**
+  - "Waiting for payment... (checking every 15s)"
+  - "Still waiting — no payment detected yet."
+  - "Payment detected! 50,000 sats received. New balance: 120,000 sats."
+- **Use webhooks when available** — register via the daemon's `/notify/register` endpoint for `swap.claimed` events instead of polling.
+- **Timeout after 5 minutes** of no payment: "No payment detected after 5 min. The address/invoice is still valid — I'll stop polling but you can ask me to check again."
+
+#### 4. Sending — Swap Execution
+
+- **Always confirm** with user before executing `cash send`.
+- Run the send command with `yieldMs=10000` for swap commands (BTC→stablecoin).
+- Relay progress:
+  - "Sending 10 USDC to 0x... on Polygon..."
+  - "Swap initiated — waiting for settlement..."
+  - "Sent! Tx: 0x... — 10 USDC delivered."
+- If backgrounded, poll `cash swap <id>` every 10s until status is `completed` or `failed`.
+- On failure: report error, suggest `cash refund <id>` if applicable.
+
+#### 5. Swap Monitoring
+
+- For any active swap, poll `cash swap <id>` every 10-15s.
+- Map status to user-friendly updates:
+  - `pending` / `awaiting_funding` → "Swap created, waiting for funding..."
+  - `funded` → "Funds received, processing swap..."
+  - `processing` → "Swap in progress, settling on-chain..."
+  - `completed` → "Swap complete! Funds delivered."
+  - `expired` → "Swap expired. You can refund with `cash refund <id>`."
+  - `failed` → "Swap failed: [error]. Check `cash swap <id>` for details."
+- After `completed`: auto-run `cash balance` and report the new balance.
+
+#### Never Do
+
+- Block silently for >15s without a status update.
+- Let a timeout kill a command without telling the user.
+- Retry failed commands without asking (except `cash login` on session expiry).
+- Go silent after generating a receive address — always poll for payment.
+- Assume a swap succeeded without checking status.
 
 ## Setup
 

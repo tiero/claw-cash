@@ -75,30 +75,25 @@ cash send --amount 10 --currency usdc --where polygon --to 0x...
 | `usdt`   | `polygon`, `arbitrum`, `ethereum`| token units |
 | `usdc`   | `polygon`, `arbitrum`, `ethereum`| token units |
 
-## Identity for Agents
+## Identity & Security
 
-Private keys live in a secure enclave. Agents authenticate with the method that fits their environment. One identity, any auth provider.
+Private keys live in an AWS Nitro Enclave — a hardware-isolated VM with no persistent storage, no network access, and no operator shell. Keys are generated inside the enclave and never leave it. The CLI signs transactions over an attested TLS channel.
 
-### Secure Enclave (Key Custody)
+### Enclave Architecture
 
-Private keys are generated and stored inside an Evervault Enclave. They never leave the enclave boundary. The CLI signs transactions by sending requests to the enclave over an attested TLS channel. Even if the host is compromised, keys remain sealed.
+- **AWS Nitro Enclave**: Dedicated CPU and memory partition, fully isolated from the parent EC2 instance. No SSH, no shell, no operator access at runtime.
+- **Attestation**: Every boot produces a cryptographic attestation document signed by the Nitro hypervisor with PCR values (hashes of the enclave image).
+- **Key Generation**: secp256k1 private keys generated inside the enclave using a cryptographically secure random source. Keys never leave the enclave boundary.
+- **Signing**: CLI sends unsigned transaction data over an attested TLS channel. The enclave signs and returns the signature.
+- **No Persistent Storage**: Encrypted key material stored externally, decryptable only inside the enclave using KMS with attestation-based policies.
+- **No Network Access**: All communication goes through a vsock channel to the parent instance.
 
-### Challenge-Callback Auth
+### Authentication
 
-Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a callback with a signed token. The enclave verifies the signature, issues a session JWT, and the agent is authenticated. No passwords, no API keys stored on disk.
+Challenge-callback auth. No passwords, no API keys on disk. The enclave verifies the auth provider's signature directly.
 
-### Auth Methods
-
-| Provider   | Status |
-|------------|--------|
-| Telegram   | Live   |
-| Slack      | Soon   |
-| Google     | Soon   |
-| 1Password  | Soon   |
-| YubiKey    | Soon   |
-| Passkeys   | Soon   |
-
-The goal: the Privy of agents. Plug any auth provider, same enclave-backed identity underneath.
+- **Telegram** (LIVE)
+- Slack, Google, 1Password, YubiKey, Passkeys (SOON)
 
 ## Payment Links
 
@@ -116,14 +111,16 @@ Agents hire other agents. Data, code reviews, web scrapes — instant micropayme
 
 Your agent offers a service and gets paid by humans in stablecoins. It converts to Bitcoin and holds verifiable money.
 
+### Pay for Inference
+
+Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy compute — paying for the thinking they need, on demand.
+
 ## Why Bitcoin for Agents?
 
 - **Fixed supply**: 21 million coins — a consensus rule, not a policy decision
 - **Cryptographic verification**: Block headers, Merkle proofs, digital signatures — all verifiable with code
 - **No counterparty risk**: No bank, no API to trust — just math and a peer-to-peer network
 - **Ark settlement**: Instant agent-to-agent transfers via VTXOs, no block confirmations needed
-
-More at [clw.cash/why](https://clw.cash/why)
 
 ## Roadmap
 
@@ -141,8 +138,6 @@ More at [clw.cash/why](https://clw.cash/why)
 
 - **Webhook Notifications** — Get notified when transactions complete, swaps settle, or balances change. Push events to your agent's event loop.
 
-More at [clw.cash/roadmap](https://clw.cash/roadmap)
-
 ## FAQ
 
 **Why Bitcoin instead of stablecoins?**
@@ -152,7 +147,7 @@ Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent 
 Not yet. x402 is on the roadmap but blocked on two fronts: ECDSA signing in the enclave ([#5](https://github.com/tiero/clw.cash/issues/5)) and the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support `cash pay <url>` with automatic BTC→stablecoin swaps.
 
 **Where are the private keys stored?**
-Inside an Evervault Enclave. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel. Even if the host machine is compromised, the keys remain inaccessible.
+Inside an AWS Nitro Enclave — a hardware-isolated VM with no persistent storage, no shell access. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel.
 
 **What currencies and networks are supported?**
 Bitcoin on-chain, Lightning, and Arkade (instant off-chain). For stablecoins: USDC and USDT on Polygon, Arbitrum, and Ethereum. The agent holds BTC and swaps to stablecoins on demand via LendaSwap and Boltz.
@@ -163,11 +158,8 @@ Yes. Claw Cash acts as a factory bot — your Telegram bot authenticates with a 
 **How fast are agent-to-agent payments?**
 Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immediately with minimal fees — no block confirmations needed. Lightning payments are also near-instant for paying external services.
 
-More at [clw.cash/faq](https://clw.cash/faq)
-
 ## Links
 
 - [Agent Skill (SKILL.md)](https://unpkg.com/clw-cash/SKILL.md) — full command reference for LLM agents
-- Built by [tiero](https://github.com/tiero)
 - Powered by [Arkade](https://arkadeos.com)
 - [Telegram](https://t.me/arkade_os)

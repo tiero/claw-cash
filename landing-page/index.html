@@ -63,10 +63,15 @@
   <nav>
     <div class="container">
       <a href="/" class="nav-logo">🦞 <span class="claw">Claw</span> Cash</a>
+      <button class="burger" onclick="this.classList.toggle('open');document.querySelector('.nav-links').classList.toggle('open')" aria-label="Menu">
+        <span></span><span></span><span></span>
+      </button>
       <ul class="nav-links">
-        <li><a href="/why" class="">Why</a></li>
-        <li><a href="/roadmap" class="">Roadmap</a></li>
-        <li><a href="/faq" class="">FAQ</a></li>
+        <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#security">Security</a></li>
+        <li><a href="#use-cases">Use Cases</a></li>
+        <li><a href="#roadmap">Roadmap</a></li>
+        <li><a href="#faq">FAQ</a></li>
       </ul>
     </div>
   </nav>
@@ -96,6 +101,34 @@
     </div>
   </header>
 
+  <!-- The Trust Issue -->
+  <section id="trust">
+    <div class="container">
+      <h2>The Trust Issue</h2>
+      <p class="section-lead">
+        An autonomous agent can receive money. But can it verify what it's holding?
+      </p>
+      <div class="problem-grid">
+        <div class="problem-card bad">
+          <h3><span class="icon red">&#10007;</span> Fiat Currency</h3>
+          <p>Value derived from institutional trust, government policy, and economic sentiment. None of this is independently verifiable by code. An agent consuming fiat data is trusting its context window.</p>
+        </div>
+        <div class="problem-card bad">
+          <h3><span class="icon red">&#10007;</span> External Data</h3>
+          <p>Exchange rates, inflation data, economic reports. All inputs an agent can consume but never independently verify. The context window is the attack surface.</p>
+        </div>
+        <div class="problem-card good">
+          <h3><span class="icon green">&#10003;</span> Bitcoin</h3>
+          <p>21 million cap. Enforced by math. Every block header is cryptographically linked. An agent can verify the chain with code—no trust required.</p>
+        </div>
+        <div class="problem-card good">
+          <h3><span class="icon green">&#10003;</span> Verifiable Money</h3>
+          <p>Block headers, Merkle proofs, digital signatures—all verifiable with CLI tools and programming languages. The agent can check the math itself.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- How it Works -->
   <section id="how-it-works">
     <div class="container">
@@ -121,7 +154,7 @@
         <div class="flow-step">
           <div class="step-num">03</div>
           <div>
-            <h3>Settle on Arkade</h3>
+            <h3>Settle on Bitcoin</h3>
             <p>Accept payments via Lightning or onchain. Internally, agents hold VTXOs on Arkade—instant transfers, minimal fees, no block confirmations. The fast lane for machine-to-machine payments.</p>
           </div>
         </div>
@@ -146,63 +179,6 @@
 <span class="cmd">cash</span> send <span class="value">lnbc500n1...</span>
         </div>
       </div>
-    </div>
-  </section>
-
-  <!-- Security & Auth -->
-  <section id="security">
-    <div class="container">
-      <div class="auth-intro">
-        <h2>Identity for Agents</h2>
-        <p class="section-lead" style="margin: 0 auto;">
-          Private keys live in a secure enclave. Agents authenticate with the method that fits their environment. One identity, any auth provider.
-        </p>
-      </div>
-
-      <div class="auth-pillars">
-        <div class="pillar">
-          <h3><span>🔐</span> Secure Enclave</h3>
-          <div class="pillar-tag">KEY CUSTODY</div>
-          <p>Private keys are generated and stored inside an Evervault Enclave. They never leave the enclave boundary. The CLI signs transactions by sending requests to the enclave over an attested TLS channel. Even if the host is compromised, keys remain sealed.</p>
-        </div>
-        <div class="pillar">
-          <h3><span>🎫</span> Challenge-Callback Auth</h3>
-          <div class="pillar-tag">AUTHENTICATION</div>
-          <p>Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a callback with a signed token. The enclave verifies the signature, issues a session JWT, and the agent is authenticated. No passwords, no API keys stored on disk.</p>
-        </div>
-      </div>
-
-      <div class="auth-methods-label">Auth methods</div>
-      <div class="auth-row">
-        <div class="auth-chip live">
-          <span class="chip-icon">✈</span> Telegram
-          <span class="chip-badge">LIVE</span>
-        </div>
-        <div class="auth-chip soon">
-          <span class="chip-icon">💬</span> Slack
-          <span class="chip-badge">SOON</span>
-        </div>
-        <div class="auth-chip soon">
-          <span class="chip-icon">🔑</span> Google
-          <span class="chip-badge">SOON</span>
-        </div>
-        <div class="auth-chip soon">
-          <span class="chip-icon">🗝</span> 1Password
-          <span class="chip-badge">SOON</span>
-        </div>
-        <div class="auth-chip soon">
-          <span class="chip-icon">🛡</span> YubiKey
-          <span class="chip-badge">SOON</span>
-        </div>
-        <div class="auth-chip soon">
-          <span class="chip-icon">🔏</span> Passkeys
-          <span class="chip-badge">SOON</span>
-        </div>
-      </div>
-
-      <p class="auth-vision">
-        <strong>The Privy of agents.</strong> Plug any auth provider. Same enclave-backed identity underneath.
-      </p>
     </div>
   </section>
 
@@ -265,6 +241,99 @@
     </div>
   </section>
 
+  <!-- Security -->
+  <section id="security">
+    <div class="container">
+      <h2>Identity for Agents</h2>
+      <p class="section-lead">
+        Private keys live in a hardware-isolated enclave. Agents authenticate with the method that fits their environment. One identity, any auth provider.
+      </p>
+
+      <div class="auth-pillars">
+        <div class="pillar">
+          <h3><span>🔐</span> AWS Nitro Enclave</h3>
+          <div class="pillar-tag">ISOLATION</div>
+          <p>Nitro Enclaves use a dedicated CPU and memory partition, fully isolated from the parent EC2 instance. There is no SSH, no shell, no way for an operator to inspect the enclave at runtime. The hypervisor enforces the boundary at the hardware level.</p>
+        </div>
+        <div class="pillar">
+          <h3><span>📜</span> Attestation</h3>
+          <div class="pillar-tag">VERIFICATION</div>
+          <p>Every enclave boot produces a cryptographic attestation document signed by the Nitro hypervisor. It includes PCR values — hashes of the enclave image. Clients can verify they're talking to the exact code they expect, not a modified version.</p>
+        </div>
+      </div>
+
+      <div class="verify-grid" style="margin-top: 48px;">
+        <div class="verify-item">
+          <h4>// Key Custody</h4>
+          <p>secp256k1 keys generated inside the enclave, never leave. No persistent storage — encrypted key material only decryptable inside via KMS with attestation-based policies.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Signing</h4>
+          <p>The CLI sends unsigned transaction data over an attested TLS channel. The enclave signs and returns the signature. The private key is never exposed.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Full Isolation</h4>
+          <p>No disk, no external network interface. All communication goes through a vsock channel to the parent instance. The hypervisor enforces the boundary at the hardware level.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Authentication -->
+  <section id="authentication">
+    <div class="container">
+      <h2>Authentication</h2>
+      <p class="section-lead">
+        Challenge-callback auth. No passwords, no API keys on disk. The enclave verifies the auth provider's signature directly.
+      </p>
+
+      <div class="auth-pillars">
+        <div class="pillar">
+          <h3><span>🎫</span> Challenge-Callback</h3>
+          <div class="pillar-tag">HOW IT WORKS</div>
+          <p>Login starts a challenge. The auth provider (Telegram, Slack, etc.) delivers a callback with a signed token. The enclave verifies the signature, issues a session JWT, and the agent is authenticated.</p>
+        </div>
+        <div class="pillar">
+          <h3><span>🤖</span> Bot Sessions</h3>
+          <div class="pillar-tag">PROGRAMMATIC</div>
+          <p>For Telegram bots, a shared API key authenticates the bot itself. Each end-user gets their own enclave-backed identity via per-user sessions. No user-facing auth flow needed.</p>
+        </div>
+      </div>
+
+      <div class="auth-methods-label">Auth methods</div>
+      <div class="auth-row">
+        <div class="auth-chip live">
+          <span class="chip-icon">✈</span> Telegram
+          <span class="chip-badge">LIVE</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">💬</span> Slack
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🔑</span> Google
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🗝</span> 1Password
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🛡</span> YubiKey
+          <span class="chip-badge">SOON</span>
+        </div>
+        <div class="auth-chip soon">
+          <span class="chip-icon">🔏</span> Passkeys
+          <span class="chip-badge">SOON</span>
+        </div>
+      </div>
+
+      <p class="auth-vision">
+        <strong>The Privy of agents.</strong> Plug any auth provider. Same enclave-backed identity underneath.
+      </p>
+    </div>
+  </section>
+
   <!-- Use Cases -->
   <section id="use-cases">
     <div class="container">
@@ -281,6 +350,135 @@
           <h3><span>💰</span> Earn Revenue</h3>
           <p>Your agent offers a service and gets paid by humans in stablecoins. It converts to Bitcoin and holds verifiable money.</p>
         </div>
+        <div class="usecase-card">
+          <h3><span>🧠</span> Pay for Inference</h3>
+          <p>Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy compute—paying for the thinking they need, on demand.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Roadmap -->
+  <section id="roadmap">
+    <div class="container">
+      <h2>Roadmap</h2>
+      <p class="section-lead">
+        What we're building, in order.
+      </p>
+      <div class="roadmap-grid">
+        <div class="roadmap-card">
+          <div class="roadmap-tag now">NOW</div>
+          <h3>MCP Server</h3>
+          <p>Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>x402 Client Support</h3>
+          <p><code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay &lt;url&gt;</code> command. Detect <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">402 Payment Required</code>, auto-swap BTC to stablecoins, retry with proof. Blocked on ECDSA signing in enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>) and x402 facilitators outside USDC on Base.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>Spending Policies</h3>
+          <p>Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag next">NEXT</div>
+          <h3>More Auth Providers</h3>
+          <p>Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.</p>
+        </div>
+        <div class="roadmap-card">
+          <div class="roadmap-tag later">LATER</div>
+          <h3>Webhook Notifications</h3>
+          <p>Get notified when transactions complete, swaps settle, or balances change. Push events to your agent's event loop.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Verifiable by Code -->
+  <section id="verify">
+    <div class="container">
+      <h2>Verifiable by Code</h2>
+      <p class="section-lead">
+        An LLM doesn't need to trust. It needs to verify.
+        Bitcoin is the only money where every claim can be checked with a CLI.
+      </p>
+      <div class="verify-grid">
+        <div class="verify-item">
+          <h4>// Fixed Supply</h4>
+          <p>21 million coins. Not a policy decision—a consensus rule. The agent can read the code and verify.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Block Headers</h4>
+          <p>Each header commits to the previous via SHA-256. The chain's integrity is math, not trust.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Merkle Proofs</h4>
+          <p>Prove a transaction exists without downloading the full blockchain. Lightweight verification for agents.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Digital Signatures</h4>
+          <p>Every transaction is cryptographically signed. The agent can verify ownership with secp256k1.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Open Source</h4>
+          <p>bitcoin-cli, btcd, rust-bitcoin—dozens of implementations. The agent can pick its own tools.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// No Counterparty</h4>
+          <p>No bank, no Fed, no API to trust. Just math and a peer-to-peer network the agent can query directly.</p>
+        </div>
+      </div>
+      <div class="manifesto">
+        <blockquote>
+          "Fiat currency requires faith. Bitcoin requires only computation.
+          For an autonomous agent, the choice is obvious—trust what you can verify."
+        </blockquote>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq">
+    <div class="container">
+      <h2>FAQ</h2>
+      <div class="faq-list">
+        <details class="faq-item">
+          <summary>Why Bitcoin instead of stablecoins?</summary>
+          <div class="faq-answer">
+            Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Is x402 payment supported?</summary>
+          <div class="faq-answer">
+            Not yet. x402 is on the roadmap but blocked on two fronts: ECDSA signing in the enclave (<a href="https://github.com/tiero/clw.cash/issues/5" style="color: var(--orange);">#5</a>) and the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support <code>cash pay &lt;url&gt;</code> with automatic BTC→stablecoin swaps.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Where are the private keys stored?</summary>
+          <div class="faq-answer">
+            Inside an AWS Nitro Enclave — a hardware-isolated VM with no persistent storage, no shell access. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>What currencies and networks are supported?</summary>
+          <div class="faq-answer">
+            Bitcoin on-chain, Lightning, and Arkade (instant off-chain). For stablecoins: USDC and USDT on Polygon, Arbitrum, and Ethereum. The agent holds BTC and swaps to stablecoins on demand via LendaSwap and Boltz.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>Can my Telegram bot use this?</summary>
+          <div class="faq-answer">
+            Yes. Claw Cash acts as a factory bot — your Telegram bot authenticates with a shared API key and gets per-user sessions via <code>POST /v1/auth/bot-session</code>. Each Telegram user gets their own enclave-backed identity. No user-facing auth flow needed.
+          </div>
+        </details>
+        <details class="faq-item">
+          <summary>How fast are agent-to-agent payments?</summary>
+          <div class="faq-answer">
+            Instant. Agents hold VTXOs on Arkade, so transfers between agents settle immediately with minimal fees — no block confirmations needed. Lightning payments are also near-instant for paying external services.
+          </div>
+        </details>
       </div>
     </div>
   </section>
@@ -301,9 +499,6 @@
             <svg class="check-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polyline points="20 6 9 17 4 12"/></svg>
           </button>
         </div>
-        <a href="https://github.com/tiero" class="btn btn-secondary">
-          Author
-        </a>
       </div>
     </div>
   </section>
@@ -312,7 +507,6 @@
     <div class="container">
       <p>
         <a href="https://unpkg.com/clw-cash/SKILL.md">Agent Skill (SKILL.md)</a> ·
-        Built by <a href="https://github.com/tiero">tiero</a> ·
         Powered by <a href="https://arkadeos.com">👾 Arkade</a> ·
         <a href="https://t.me/arkade_os">Telegram</a>
       </p>
@@ -320,6 +514,13 @@
   </footer>
 
   <script>
+  document.querySelectorAll('.nav-links a').forEach(function(link) {
+    link.addEventListener('click', function() {
+      document.querySelector('.burger').classList.remove('open');
+      document.querySelector('.nav-links').classList.remove('open');
+    });
+  });
+
   function copyCommand(el) {
     var cmd = el.querySelector('.terminal-cmd').textContent.trim();
     navigator.clipboard.writeText(cmd).then(function() {

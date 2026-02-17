@@ -101,7 +101,7 @@ Agents generate payment links. Humans pay with their wallet. No app downloads, n
 
 ## Hold Sats, Pay the World
 
-Agents accumulate and hold Bitcoin. When they need to pay for something — a stablecoin transfer, any fiat-denominated cost — they swap BTC to stablecoins on the fly. Bitcoin is the treasury, stablecoins are the payment rail.
+Agents accumulate and hold Bitcoin. When they need to pay for something — a stablecoin transfer, any fiat-denominated cost — they swap BTC to stablecoins on the fly. Bitcoin is the treasury, stablecoins are the payment rail. Works with [OpenClaw](https://openclaw.ai), Claude Code, or any agent harness.
 
 ### Pay Other Agents
 

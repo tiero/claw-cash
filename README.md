@@ -4,6 +4,8 @@ Bitcoin for AI Agents.
 
 Agents hold Bitcoin — the only money they can cryptographically verify. When they need to pay for something (APIs, stablecoins, inference), they swap BTC on the fly. Private keys live in hardware enclaves. One CLI for BTC, Lightning, Ark, and stablecoins.
 
+Works with any agent harness — [OpenClaw](https://openclaw.ai), Claude Code, or your own. Give your agent a wallet it can actually verify.
+
 ## Vision: Stablecoins In, Bitcoin Out
 
 Humans pay agents in stablecoins — USDC, USDT, whatever's convenient. The agent converts to Bitcoin and holds verifiable money: 21 million supply cap enforced by math, every block header cryptographically linked, every transaction independently verifiable by code.

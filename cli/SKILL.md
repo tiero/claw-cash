@@ -125,14 +125,17 @@ CLW_DAEMON_PORT=3457          # default: 3457
 ### Send Bitcoin
 
 ```bash
-# Send sats via Ark (instant, off-chain)
+# Send via Ark (instant, off-chain) — use the unit that matches user input
 cash send --amount 100000 --currency sats --where arkade --to <ark-address>
+cash send --amount 0.001  --currency btc  --where arkade --to <ark-address>
 
-# Send sats on-chain
+# Send on-chain
 cash send --amount 100000 --currency sats --where onchain --to <bitcoin-address>
+cash send --amount 0.001  --currency btc  --where onchain --to <bitcoin-address>
 
 # Pay a Lightning invoice
 cash send --amount 50000 --currency sats --where lightning --to <bolt11-invoice>
+cash send --amount 0.001 --currency btc  --where lightning --to <bolt11-invoice>
 
 # Auto-detect invoice format (bolt11 or BIP21, positional arg)
 cash send lnbc500n1pj...
@@ -154,15 +157,17 @@ cash send --amount 50 --currency usdc --where arbitrum --to <0x-address>
 ```bash
 # Get an Ark address
 cash receive --amount 100000 --currency sats --where arkade
-# -> {"ok": true, "data": {"address": "ark1q...", "type": "ark", "amount": 100000}}
+cash receive --amount 0.001  --currency btc  --where arkade
 
-# Create a Lightning invoice
+# Create a Lightning invoice — use the unit that matches user input
 cash receive --amount 50000 --currency sats --where lightning
 # -> {"ok": true, "data": {"bolt11": "lnbc...", "paymentHash": "...", "amount": 50000}}
+cash receive --amount 0.001 --currency btc  --where lightning
+# -> {"ok": true, "data": {"bolt11": "lnbc...", "paymentHash": "...", "amount": 100000}}
 
 # Get a boarding (on-chain) address
 cash receive --amount 100000 --currency sats --where onchain
-# -> {"ok": true, "data": {"address": "bc1q...", "type": "onchain", "amount": 100000}}
+cash receive --amount 0.001  --currency btc  --where onchain
 ```
 
 ### Receive Stablecoins (Stablecoin to BTC swap)
@@ -302,8 +307,8 @@ Error (stderr):
 
 | Currency | Networks                    | Notes                                     |
 | -------- | --------------------------- | ----------------------------------------- |
-| sats     | onchain, lightning, arkade  | Amount in satoshis (use `sats` not `btc`) |
-| btc      | onchain, lightning, arkade  | Amount in BTC (e.g. 0.001)                |
+| sats     | onchain, lightning, arkade  | Amount in satoshis — use when user says "sats" |
+| btc      | onchain, lightning, arkade  | Amount in BTC — use when user says "BTC"        |
 | usdt     | polygon, ethereum, arbitrum |                                           |
 | usdc     | polygon, ethereum, arbitrum |                                           |
 

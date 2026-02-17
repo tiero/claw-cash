@@ -8,7 +8,7 @@ Secure identity infrastructure that lets AI agents hold, sign, and transact with
 
 Agents accumulate and hold Bitcoin (sats). When they need to pay for something — an API behind a paywall, a stablecoin transfer, an x402-protected resource — they swap BTC to stablecoins on the fly and send. The agent never needs to hold stablecoins as a reserve; Bitcoin is the treasury, stablecoins are the payment rail.
 
-This means clw.cash is **x402-compatible by design**. When an agent hits a `402 Payment Required` response demanding USDC on Polygon, it already has everything it needs: `cash send --amount 10 --currency usdc --where polygon --to <address>` swaps BTC→USDC atomically and delivers the payment. The swap infrastructure (LendaSwap + Boltz) handles the cross-chain bridge. The agent just says "pay X in currency Y" and it works.
+This architecture is designed to support x402 payments — when an agent hits a `402 Payment Required` response, it can swap BTC to the required stablecoin and pay on the fly. x402 client support is on the roadmap, pending ECDSA signing in the enclave and facilitators outside USDC on Base.
 
 ## How it works
 
@@ -223,7 +223,7 @@ ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 
 ### Next
 
-- [ ] **x402 client support** — `cash pay <url>` command, auto-swap BTC→stablecoin, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5))
+- [ ] **x402 client support** — `cash pay <url>` command, auto-swap BTC→stablecoin, retry with proof. Blocked on ECDSA signing in enclave ([#5](https://github.com/tiero/clw.cash/issues/5)) and x402 facilitators outside USDC on Base
 - [ ] **Spending policies** — per-agent limits, allowlists, time-based rules, enforced at enclave level
 - [ ] **More auth providers** — Slack, Google, 1Password, YubiKey, Passkeys
 

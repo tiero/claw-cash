@@ -54,6 +54,7 @@ RATE_LIMIT_WINDOW_MS = "60000"
 RATE_LIMIT_PER_USER = "60"
 RATE_LIMIT_PER_IDENTITY_SIGN = "20"
 ALLOWED_ORIGINS = "https://pay.clw.cash"
+ALLOW_TEST_AUTH = "false"
 
 [[env.production.d1_databases]]
 binding = "DB"

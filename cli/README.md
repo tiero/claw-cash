@@ -21,10 +21,12 @@ cash login
 cash balance
 
 # Send funds
+cash send --amount 0.001 --currency btc --where arkade --to ark1q...
 cash send --amount 100000 --currency sats --where arkade --to ark1q...
 cash send lnbc500n1...
 
 # Receive funds
+cash receive --amount 0.001 --currency btc --where lightning
 cash receive --amount 100000 --currency sats --where lightning
 ```
 

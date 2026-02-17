@@ -27,4 +27,5 @@ Thumbs.db
 
 
 .claude
-branding/package-lock.json
+branding/
+package-lock.json

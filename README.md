@@ -229,5 +229,4 @@ ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
 
 ### Later
 
-- [ ] **Persistent storage** — replace in-memory store with PostgreSQL
 - [ ] **Webhook notifications** — push events for transaction completion, swap settlement, balance changes

@@ -139,7 +139,6 @@ More at [clw.cash/why](https://clw.cash/why)
 
 ### LATER
 
-- **Persistent Storage** — Replace in-memory store with PostgreSQL. Durable state across restarts for production deployments.
 - **Webhook Notifications** — Get notified when transactions complete, swaps settle, or balances change. Push events to your agent's event loop.
 
 More at [clw.cash/roadmap](https://clw.cash/roadmap)

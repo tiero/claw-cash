@@ -538,3 +538,105 @@ describe("Auth guards", () => {
     expect(status).toBe(401);
   });
 });
+
+describe("SDK ClwApiClient.signDigest()", () => {
+  let sessionToken: string;
+  let identityId: string;
+  let publicKey: string;
+
+  it("setup: authenticate and create identity", async () => {
+    const challenge = await post("/v1/auth/challenge", {
+      telegram_user_id: "sdk_test_user_" + Date.now(),
+    });
+    const { json } = await post("/v1/auth/verify", {
+      challenge_id: challenge.json.challenge_id,
+    });
+    sessionToken = json.token;
+
+    const identity = await post(
+      "/v1/identities",
+      { alg: "secp256k1" },
+      sessionToken
+    );
+    expect(identity.status).toBe(201);
+    identityId = identity.json.id;
+    publicKey = identity.json.public_key;
+  });
+
+  it("signDigest() combines sign-intent + sign in one call", async () => {
+    // Import the SDK
+    const { ClwApiClient } = await import("../remote-signer-identity/src/apiClient.js");
+    
+    const client = new ClwApiClient(API_BASE, identityId, sessionToken);
+    const digest = randomBytes(32).toString("hex");
+    
+    // This should handle the two-step flow internally
+    const signature = await client.signDigest(digest);
+    
+    expect(signature).toBeDefined();
+    expect(typeof signature).toBe("string");
+    // BIP-340 Schnorr signatures are 64 bytes = 128 hex chars
+    expect(signature.length).toBe(128);
+    expect(/^[0-9a-f]{128}$/i.test(signature)).toBe(true);
+  });
+
+  it("signDigest() signature is valid BIP-340 Schnorr", async () => {
+    const { ClwApiClient } = await import("../remote-signer-identity/src/apiClient.js");
+    // Use @noble/secp256k1 v3 (same as enclave)
+    const { schnorr, hashes } = await import("@noble/secp256k1");
+    const { createHash, createHmac } = await import("node:crypto");
+    
+    // Configure hash functions (required for @noble/secp256k1 v3)
+    hashes.hmacSha256 = (key: Uint8Array, ...msgs: Uint8Array[]): Uint8Array => {
+      const hmac = createHmac("sha256", key);
+      for (const msg of msgs) hmac.update(msg);
+      return new Uint8Array(hmac.digest());
+    };
+    hashes.sha256 = (...msgs: Uint8Array[]): Uint8Array => {
+      const h = createHash("sha256");
+      for (const msg of msgs) h.update(msg);
+      return new Uint8Array(h.digest());
+    };
+    
+    const client = new ClwApiClient(API_BASE, identityId, sessionToken);
+    const digest = randomBytes(32).toString("hex");
+    
+    const signature = await client.signDigest(digest);
+    
+    // Convert hex strings to Uint8Array
+    const digestBytes = Uint8Array.from(Buffer.from(digest, "hex"));
+    const sigBytes = Uint8Array.from(Buffer.from(signature, "hex"));
+    // x-only pubkey is the last 32 bytes of the 33-byte compressed key
+    const xOnlyPubkey = Uint8Array.from(Buffer.from(publicKey, "hex")).slice(1);
+    
+    // Verify the signature using @noble/secp256k1
+    const isValid = schnorr.verify(sigBytes, digestBytes, xOnlyPubkey);
+    expect(isValid).toBe(true);
+  });
+
+  it("signDigest() with 0x prefix works", async () => {
+    const { ClwApiClient } = await import("../remote-signer-identity/src/apiClient.js");
+    
+    const client = new ClwApiClient(API_BASE, identityId, sessionToken);
+    const digest = "0x" + randomBytes(32).toString("hex");
+    
+    // The API should handle the 0x prefix
+    const signature = await client.signDigest(digest);
+    
+    expect(signature).toBeDefined();
+    expect(signature.length).toBe(128);
+  });
+
+  it("signDigest() with invalid digest length throws", async () => {
+    const { ClwApiClient, ClwApiError } = await import("../remote-signer-identity/src/apiClient.js");
+    
+    const client = new ClwApiClient(API_BASE, identityId, sessionToken);
+    
+    await expect(client.signDigest("abc123")).rejects.toThrow();
+  });
+
+  it("cleanup: delete identity", async () => {
+    const { status } = await del(`/v1/identities/${identityId}`, sessionToken);
+    expect(status).toBe(200);
+  });
+});

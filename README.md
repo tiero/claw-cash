@@ -1,4 +1,4 @@
-# clw.cash
+# 🦞 claw-cash
 
 [![npm](https://img.shields.io/npm/v/clw-cash)](https://www.npmjs.com/package/clw-cash)
 

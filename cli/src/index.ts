@@ -16,6 +16,7 @@ import { handleLogin } from "./commands/login.js";
 import { handleSwap } from "./commands/swap.js";
 import { handleConfig } from "./commands/config.js";
 import { handleSignDigest } from "./commands/sign-digest.js";
+import { handleSignPsbt } from "./commands/sign-psbt.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -41,6 +42,8 @@ Usage:
     --address <destination>     Refund destination (optional)
   cash sign-digest <hex>        Sign a raw 32-byte digest (Schnorr/BIP-340)
                                 Use for Taproot multisig coordination
+  cash sign-psbt <base64>       Sign a PSBT (Partially Signed Bitcoin Transaction)
+                                Parses PSBT, shows tx details, signs inputs (recommended)
 
 Currency: btc | sats | usdt | usdc
           btc = amount in BTC (e.g. 0.001), sats = amount in satoshis (e.g. 100000)
@@ -171,6 +174,9 @@ async function main() {
         break;
       case "sign-digest":
         await handleSignDigest(ctx, argv);
+        break;
+      case "sign-psbt":
+        await handleSignPsbt(ctx, argv);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

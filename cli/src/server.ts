@@ -263,63 +263,6 @@ export function createDaemonServer(opts: DaemonServerOpts): Server {
         return json(res, 200, balance);
       }
 
-      // POST /sign-digest — sign a raw 32-byte digest with Schnorr (BIP-340)
-      // Used for Taproot multisig coordination
-      if (method === "POST" && url.pathname === "/sign-digest") {
-        const body = await readBody(req);
-        const digestInput = body.digest as string;
-
-        if (!digestInput) {
-          return json(res, 400, { 
-            error: "Missing digest",
-            hint: "Provide a 32-byte hex digest in the request body: { \"digest\": \"abc123...\" }",
-          });
-        }
-
-        // Normalize: strip 0x prefix, lowercase
-        const digest = digestInput.startsWith("0x") 
-          ? digestInput.slice(2).toLowerCase() 
-          : digestInput.toLowerCase();
-
-        // Validate: exactly 64 hex characters (32 bytes)
-        if (!/^[0-9a-f]{64}$/.test(digest)) {
-          return json(res, 400, { 
-            error: "Invalid digest format",
-            expected: "32 bytes (64 hex characters)",
-            got: `${digest.length} characters`,
-          });
-        }
-
-        const { loadConfig } = await import("./config.js");
-        const { ClwApiClient, ClwApiError } = await import("@clw-cash/sdk");
-        const config = loadConfig();
-
-        try {
-          const apiClient = new ClwApiClient(
-            config.apiBaseUrl,
-            config.identityId,
-            config.sessionToken
-          );
-
-          const signature = await apiClient.signDigest(digest);
-
-          return json(res, 200, {
-            digest,
-            signature: signature.toLowerCase(),
-            publicKey: config.publicKey,
-            signatureFormat: "BIP-340 Schnorr (64 bytes)",
-            note: "For Taproot script-path spending, append sighash type byte if not SIGHASH_DEFAULT.",
-          });
-        } catch (err) {
-          if (err instanceof ClwApiError) {
-            return json(res, err.statusCode >= 500 ? 502 : err.statusCode, { 
-              error: err.message,
-            });
-          }
-          throw err;
-        }
-      }
-
       // POST /auth/start — begin non-blocking auth, daemon polls in background
       if (method === "POST" && url.pathname === "/auth/start") {
         const body = await readBody(req);

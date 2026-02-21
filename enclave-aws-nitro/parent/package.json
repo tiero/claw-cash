@@ -1,0 +1,21 @@
+{
+  "name": "clw-cash-nitro-parent",
+  "version": "0.1.0",
+  "description": "Parent EC2 daemon: HTTP bridge + KMS vsock proxy for AWS Nitro enclave",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "NITRO_DEV_MODE=true tsx src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.0.0",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.13.4",
+    "tsx": "^4.19.3",
+    "typescript": "^5.7.3"
+  }
+}

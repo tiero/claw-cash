@@ -8,6 +8,9 @@ importers:
 
   .:
     devDependencies:
+      '@noble/secp256k1':
+        specifier: 3.0.0
+        version: 3.0.0
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@22.19.11)(tsx@4.21.0)

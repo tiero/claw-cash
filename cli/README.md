@@ -46,6 +46,37 @@ cash receive --amount 100000 --currency sats --where lightning
 | `cash swaps` | List swaps (last 5 per category) |
 | `cash claim <id>` | Manually claim a swap (reveal preimage) |
 | `cash refund <id>` | Manually refund a swap |
+| `cash sign-digest <hex>` | Sign a raw 32-byte digest with Schnorr (BIP-340) |
+
+### Sign Digest (BIP-340 Schnorr)
+
+The `sign-digest` command signs a raw 32-byte digest using BIP-340 Schnorr signatures. This is useful for:
+
+- **Taproot multisig coordination** — Sign pre-computed BIP-341 sighashes
+- **Multi-agent wallet coordination** — Allow multiple agents to co-sign transactions
+- **Off-chain attestations** — Sign arbitrary 32-byte messages with your wallet key
+
+```bash
+# Sign a 32-byte hex digest (64 chars)
+cash sign-digest e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+# With 0x prefix (stripped automatically)
+cash sign-digest 0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+
+# Using flags
+cash sign-digest --hex <digest>
+cash sign-digest --digest <digest>
+```
+
+**Output:**
+```json
+{
+  "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "signature": "...128 hex characters (64 bytes)...",
+  "publicKey": "02...",
+  "signatureFormat": "BIP-340 Schnorr (64 bytes)"
+}
+```
 
 ### Supported currencies and networks
 

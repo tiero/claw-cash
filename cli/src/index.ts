@@ -15,6 +15,7 @@ import { handleRefund } from "./commands/refund.js";
 import { handleLogin } from "./commands/login.js";
 import { handleSwap } from "./commands/swap.js";
 import { handleConfig } from "./commands/config.js";
+import { handleSignPsbt } from "./commands/sign-psbt.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -38,6 +39,8 @@ Usage:
   cash claim <swapId>           Manually claim a swap (reveal preimage)
   cash refund <swapId>          Manually refund a swap
     --address <destination>     Refund destination (optional)
+  cash sign-psbt <base64>       Sign a PSBT (Partially Signed Bitcoin Transaction)
+                                Parses PSBT, shows tx details, signs inputs
 
 Currency: btc | sats | usdt | usdc
           btc = amount in BTC (e.g. 0.001), sats = amount in satoshis (e.g. 100000)
@@ -165,6 +168,9 @@ async function main() {
         break;
       case "refund":
         await handleRefund(ctx, argv);
+        break;
+      case "sign-psbt":
+        await handleSignPsbt(ctx, argv);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

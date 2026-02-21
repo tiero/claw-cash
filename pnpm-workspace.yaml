@@ -5,3 +5,5 @@ packages:
   - "skills"
   - "cli"
   - "web"
+  - "enclave-aws-nitro/enclave"
+  - "enclave-aws-nitro/parent"

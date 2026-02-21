@@ -1,0 +1,70 @@
+{
+  "_comment": [
+    "KMS CMK key policy for the Nitro enclave signing service.",
+    "",
+    "BEFORE USE — fill in the placeholder values:",
+    "  ACCOUNT_ID   — your 12-digit AWS account ID",
+    "  ADMIN_ROLE   — ARN of the IAM role that can manage the key",
+    "  EC2_ROLE     — ARN of the EC2 instance profile role (for Encrypt)",
+    "  PCR0         — SHA384 from nitro.toml [pcr] section",
+    "  PCR1         — SHA384 from nitro.toml [pcr] section",
+    "  PCR2         — SHA384 from nitro.toml [pcr] section",
+    "",
+    "Key design:",
+    "  • EC2 instance role can call kms:Encrypt (sealing backups is fine from parent)",
+    "  • kms:Decrypt is ONLY allowed when the request includes a valid NSM attestation",
+    "    document whose PCR0/1/2 match the deployed enclave image — the parent instance",
+    "    cannot decrypt even though it runs on the same EC2 host",
+    "  • Key administrators (ADMIN_ROLE) can rotate, disable, or delete the key"
+  ],
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "KeyAdministration",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/ADMIN_ROLE"
+      },
+      "Action": [
+        "kms:Create*",
+        "kms:Describe*",
+        "kms:Enable*",
+        "kms:List*",
+        "kms:Put*",
+        "kms:Update*",
+        "kms:Revoke*",
+        "kms:Disable*",
+        "kms:Get*",
+        "kms:Delete*",
+        "kms:ScheduleKeyDeletion",
+        "kms:CancelKeyDeletion"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowEncryptFromEC2Instance",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/EC2_ROLE"
+      },
+      "Action": "kms:Encrypt",
+      "Resource": "*"
+    },
+    {
+      "Sid": "AllowDecryptOnlyFromVerifiedNitroEnclave",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::ACCOUNT_ID:role/EC2_ROLE"
+      },
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": {
+        "StringEqualsIgnoreCase": {
+          "kms:RecipientAttestation:PCR0": "PCR0",
+          "kms:RecipientAttestation:PCR1": "PCR1",
+          "kms:RecipientAttestation:PCR2": "PCR2"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+# AWS Nitro Enclave configuration
+# Analogous to enclave.toml (Evervault)
+#
+# Fields managed here are used by infra/build-eif.sh and infra/setup-parent.sh.
+# PCR values are written to this file after `nitro-cli build-enclave` and must
+# be committed so that the KMS key policy (infra/kms-key-policy.json) can be
+# updated to match.
+
+version = 1
+name    = "clw-cash-signer"
+
+# EC2 / Nitro resource allocation for the enclave
+[enclave]
+cpu_count  = 2        # vCPUs allocated to the enclave (min 2)
+memory_mib = 512      # MiB of RAM allocated
+
+# vsock ports
+[vsock]
+enclave_app_port  = 5000   # enclave listens here; parent HTTP bridge connects to it
+kms_proxy_port    = 8000   # parent KMS proxy listens here; enclave connects to it
+enclave_cid       = ""     # filled in at runtime by nitro-cli (use describe-enclaves)
+
+# KMS configuration (fill in after creating the CMK)
+[kms]
+key_arn    = ""    # arn:aws:kms:<region>:<account>:key/<uuid>
+region     = ""    # e.g. us-east-1
+
+# PCR measurements — filled in by build-eif.sh after `nitro-cli build-enclave`
+# These must match the KMS key policy conditions.
+[pcr]
+PCR0 = ""   # SHA384 of enclave image (kernel + app)
+PCR1 = ""   # SHA384 of Linux kernel and bootstrap
+PCR2 = ""   # SHA384 of user application
+
+# Parent HTTP bridge TLS (optional — can terminate TLS at an ALB instead)
+[tls]
+cert_path = "/etc/nitro-signer/tls.crt"
+key_path  = "/etc/nitro-signer/tls.key"
+listen_port = 7443

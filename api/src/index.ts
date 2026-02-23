@@ -18,6 +18,7 @@ import {
   normalizeDigestHex,
 } from "./validation.js";
 import type { SessionClaims, SupportedAlg, Identity } from "./types.js";
+import { sendDailyDigest } from "./digest.js";
 
 type HonoEnv = { Bindings: Env; Variables: { auth: SessionClaims } };
 
@@ -438,4 +439,9 @@ app.onError((err, c) => {
   return c.json({ error: "Internal server error" }, 500);
 });
 
-export default app;
+export default {
+  fetch: app.fetch.bind(app),
+  async scheduled(_controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(sendDailyDigest(env));
+  },
+} satisfies ExportedHandler<Env>;

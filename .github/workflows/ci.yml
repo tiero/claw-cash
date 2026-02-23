@@ -26,3 +26,37 @@ jobs:
 
       - name: E2E tests
         run: pnpm test
+
+  localstack-integration:
+    runs-on: ubuntu-latest
+    services:
+      localstack:
+        image: localstack/localstack:latest
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: kms
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Wait for LocalStack KMS
+        run: |
+          timeout 60 bash -c \
+            'until curl -sf http://localhost:4566/_localstack/health | grep -q "\"kms\""; do sleep 2; done'
+
+      - name: KMS proxy integration tests
+        run: pnpm vitest run test/enclave-aws-nitro/kms-proxy-localstack.test.ts
+        env:
+          LOCALSTACK_ENDPOINT: http://localhost:4566
+          AWS_ACCESS_KEY_ID: test
+          AWS_SECRET_ACCESS_KEY: test
+          AWS_REGION: us-east-1

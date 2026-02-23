@@ -1,0 +1,10 @@
+{
+  "name": "enclave-aws-nitro",
+  "version": "0.1.0",
+  "description": "Self-hosted Evervault-compatible enclave on AWS Nitro Enclaves",
+  "private": true,
+  "workspaces": [
+    "enclave",
+    "parent"
+  ]
+}

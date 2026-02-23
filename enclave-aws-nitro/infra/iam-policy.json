@@ -1,0 +1,29 @@
+{
+  "_comment": [
+    "IAM policy to attach to the EC2 instance profile role.",
+    "Attach as an inline or managed policy to the role that the parent EC2 instance uses.",
+    "",
+    "Replace KMS_KEY_ARN with the ARN of the CMK created in kms-key-policy.json."
+  ],
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "AllowKmsEncryptDecryptForEnclave",
+      "Effect": "Allow",
+      "Action": [
+        "kms:Encrypt",
+        "kms:Decrypt",
+        "kms:DescribeKey"
+      ],
+      "Resource": "KMS_KEY_ARN"
+    },
+    {
+      "Sid": "AllowDescribeEnclaves",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

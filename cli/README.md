@@ -46,37 +46,58 @@ cash receive --amount 100000 --currency sats --where lightning
 | `cash swaps` | List swaps (last 5 per category) |
 | `cash claim <id>` | Manually claim a swap (reveal preimage) |
 | `cash refund <id>` | Manually refund a swap |
-| `cash sign-digest <hex>` | Sign a raw 32-byte digest with Schnorr (BIP-340) |
+| `cash sign-psbt <psbt>` | Sign a PSBT (Partially Signed Bitcoin Transaction) |
 
-### Sign Digest (BIP-340 Schnorr)
+### Sign PSBT (Taproot Multisig Coordination)
 
-The `sign-digest` command signs a raw 32-byte digest using BIP-340 Schnorr signatures. This is useful for:
+The `sign-psbt` command signs Bitcoin transactions using PSBTs (BIP-174). This is the **recommended and secure way** to sign transactions because:
 
-- **Taproot multisig coordination** — Sign pre-computed BIP-341 sighashes
-- **Multi-agent wallet coordination** — Allow multiple agents to co-sign transactions
-- **Off-chain attestations** — Sign arbitrary 32-byte messages with your wallet key
+- **No blind signing** — You see exactly what you're signing (inputs, outputs, fees) before signing
+- **Automatic sighash computation** — Correctly computes BIP-341 Taproot sighashes for each input
+- **Multi-party coordination** — Works with Taproot script-path multisig setups
+- **PSBT standard** — Returns an updated PSBT that can be combined with other signatures
+
+**Why not support raw digest signing?** Signing arbitrary digests is dangerous because you don't know what transaction you're authorizing. An attacker could trick you into signing a malicious transaction by computing its sighash and asking you to "sign this digest". PSBT-aware signing prevents this by parsing and displaying the transaction before signing.
 
 ```bash
-# Sign a 32-byte hex digest (64 chars)
-cash sign-digest e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-
-# With 0x prefix (stripped automatically)
-cash sign-digest 0xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+# Sign a base64-encoded PSBT
+cash sign-psbt cHNidP8BAIkCAAAAA...
 
 # Using flags
-cash sign-digest --hex <digest>
-cash sign-digest --digest <digest>
+cash sign-psbt --psbt <base64-psbt>
+cash sign-psbt --hex <hex-encoded-psbt>
 ```
 
 **Output:**
 ```json
 {
-  "digest": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-  "signature": "...128 hex characters (64 bytes)...",
-  "publicKey": "02...",
-  "signatureFormat": "BIP-340 Schnorr (64 bytes)"
+  "summary": {
+    "inputsTotal": 2,
+    "outputsTotal": 1,
+    "fee": "1000 sats",
+    "inputsSigned": 2
+  },
+  "signatures": [
+    {
+      "inputIndex": 0,
+      "signature": "...128 hex characters (64 bytes BIP-340 Schnorr)..."
+    }
+  ],
+  "psbt": {
+    "base64": "cHNidP8...",
+    "hex": "70736274..."
+  },
+  "publicKey": "9350761ae700...",
+  "note": "PSBT updated with signatures. Pass to other signers or finalize if threshold met."
 }
 ```
+
+**Use Case: Multi-Agent Taproot Multisig**
+1. Coordinator creates a PSBT with all inputs and outputs
+2. Each agent runs `cash sign-psbt <psbt>`
+3. Agent sees transaction details and confirms safety
+4. Agent signs only inputs containing their public key
+5. Coordinator collects all signatures and finalizes the transaction
 
 ### Supported currencies and networks
 

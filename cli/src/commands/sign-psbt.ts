@@ -1,11 +1,10 @@
 import { outputSuccess, outputError } from "../output.js";
-import { getDaemonUrl, daemonPost } from "../daemonClient.js";
 import { loadConfig, validateConfig } from "../config.js";
 import { ClwApiClient } from "@clw-cash/sdk";
 import type { ParsedArgs } from "minimist";
 import * as btc from "@scure/btc-signer";
 import { tapLeafHash } from "@scure/btc-signer/payment.js";
-import { hex } from "@scure/base";
+import { hex, base64 } from "@scure/base";
 
 /**
  * Sign a PSBT (Partially Signed Bitcoin Transaction) with the wallet's Schnorr key.
@@ -45,7 +44,7 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
       psbtBytes = hex.decode(psbtInput);
     } else {
       // Base64 encoded
-      psbtBytes = Uint8Array.from(atob(psbtInput), c => c.charCodeAt(0));
+      psbtBytes = base64.decode(psbtInput);
     }
   } catch {
     return outputError(
@@ -125,9 +124,23 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
         // leafEntry is [controlBlock, script] tuple
         const [controlBlock, script] = leafEntry;
         if (!script) continue;
-        
-        const scriptHex = hex.encode(script).toLowerCase();
-        if (scriptHex.includes(walletPubkey)) {
+
+        // Check if our pubkey appears in the script as a proper push (0x20 prefix for 32-byte push)
+        const walletPubkeyBytes = hex.decode(walletPubkey);
+        let foundPubkey = false;
+
+        // Look for 0x20 (OP_PUSHBYTES_32) followed by our pubkey
+        for (let pos = 0; pos < script.length - 32; pos++) {
+          if (script[pos] === 0x20) {
+            const pushedData = script.slice(pos + 1, pos + 33);
+            if (pushedData.every((byte, idx) => byte === walletPubkeyBytes[idx])) {
+              foundPubkey = true;
+              break;
+            }
+          }
+        }
+
+        if (foundPubkey) {
           analysis.canSign = true;
           
           // Compute sighash for this input using btc-signer's built-in method
@@ -224,7 +237,23 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     inputsWeCanSign: inputsToSign.length,
   };
 
+  // Check if we found key-path inputs that we can't sign yet
+  const keyPathInputsWithOurKey = inputAnalysis.filter(
+    i => i.type === 'taproot-key-path' && i.canSign
+  );
+
   if (inputsToSign.length === 0) {
+    if (keyPathInputsWithOurKey.length > 0) {
+      return outputError(
+        `Cannot sign Taproot key-path inputs (not yet implemented).\n\n` +
+        `Wallet pubkey: ${walletPubkey}\n\n` +
+        `Found ${keyPathInputsWithOurKey.length} Taproot key-path input(s) with this wallet's internal key, ` +
+        `but key-path signing is not implemented yet.\n\n` +
+        `Currently only Taproot script-path signing is supported.\n\n` +
+        `Transaction summary:\n${JSON.stringify(summary, null, 2)}`
+      );
+    }
+
     return outputError(
       `No inputs to sign with this wallet.\n\n` +
       `Wallet pubkey: ${walletPubkey}\n\n` +
@@ -233,39 +262,21 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     );
   }
 
-  // Sign each input
+  // Sign each input via API (enclave)
   const signatures: Array<{
     index: number;
     sighash: string;
     signature: string;
   }> = [];
 
-  const daemonUrl = getDaemonUrl();
-  
+  const apiClient = new ClwApiClient(
+    config.apiBaseUrl,
+    config.identityId,
+    config.sessionToken
+  );
+
   for (const input of inputsToSign) {
-    let signature: string;
-    
-    if (daemonUrl) {
-      try {
-        const result = await daemonPost("/sign-digest", { digest: input.sighash });
-        signature = (result as { signature: string }).signature;
-      } catch {
-        // Fall back to direct API
-        const apiClient = new ClwApiClient(
-          config.apiBaseUrl,
-          config.identityId,
-          config.sessionToken
-        );
-        signature = await apiClient.signDigest(input.sighash);
-      }
-    } else {
-      const apiClient = new ClwApiClient(
-        config.apiBaseUrl,
-        config.identityId,
-        config.sessionToken
-      );
-      signature = await apiClient.signDigest(input.sighash);
-    }
+    const signature = await apiClient.signDigest(input.sighash);
 
     signatures.push({
       index: input.index,
@@ -279,19 +290,25 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
         const pubKeyBytes = hex.decode(walletPubkey);
         const leafHashBytes = hex.decode(input.leafHash);
         const sigBytes = hex.decode(signature);
-        
+
         tx.updateInput(input.index, {
           tapScriptSig: [[{ pubKey: pubKeyBytes, leafHash: leafHashBytes }, sigBytes]],
         });
       } catch (err) {
-        console.error(`Warning: Could not add signature to PSBT input ${input.index}:`, err);
+        const message = err instanceof Error ? err.message : String(err);
+        return outputError(
+          `Failed to add signature to PSBT input ${input.index}.\n\n` +
+          `Error: ${message}\n\n` +
+          `The signature was created successfully, but could not be added to the PSBT. ` +
+          `This may indicate an incompatible PSBT structure.`
+        );
       }
     }
   }
 
   // Export updated PSBT
   const updatedPsbtBytes = tx.toPSBT();
-  const updatedPsbtBase64 = btoa(String.fromCharCode(...updatedPsbtBytes));
+  const updatedPsbtBase64 = base64.encode(updatedPsbtBytes);
   const updatedPsbtHex = hex.encode(updatedPsbtBytes);
 
   return outputSuccess({

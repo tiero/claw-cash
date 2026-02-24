@@ -1,9 +1,10 @@
 import { outputSuccess, outputError } from "../output.js";
 import { getDaemonUrl, daemonPost } from "../daemonClient.js";
 import { loadConfig, validateConfig } from "../config.js";
-import { ClwApiClient, ClwApiError } from "@clw-cash/sdk";
+import { ClwApiClient } from "@clw-cash/sdk";
 import type { ParsedArgs } from "minimist";
 import * as btc from "@scure/btc-signer";
+import { tapLeafHash } from "@scure/btc-signer/payment.js";
 import { hex } from "@scure/base";
 
 /**
@@ -18,11 +19,6 @@ import { hex } from "@scure/base";
  *   cash sign-psbt <base64-psbt>
  *   cash sign-psbt --psbt <base64-psbt>
  *   cash sign-psbt --hex <hex-psbt>
- *
- * The command will:
- * 1. Parse the PSBT and display transaction details
- * 2. Sign any inputs where the wallet's pubkey is a signer
- * 3. Return the updated PSBT with signatures
  */
 export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<never> {
   // Get PSBT from args
@@ -51,11 +47,21 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
       // Base64 encoded
       psbtBytes = Uint8Array.from(atob(psbtInput), c => c.charCodeAt(0));
     }
-  } catch (err) {
+  } catch {
     return outputError(
       `Failed to decode PSBT.\n\n` +
       `Expected: Base64 or hex encoded PSBT\n` +
       `Make sure the PSBT is properly encoded.`
+    );
+  }
+
+  // Verify PSBT magic bytes
+  const PSBT_MAGIC = new Uint8Array([0x70, 0x73, 0x62, 0x74, 0xff]); // "psbt" + 0xff
+  if (psbtBytes.length < 5 || !PSBT_MAGIC.every((b, i) => psbtBytes[i] === b)) {
+    return outputError(
+      `Invalid PSBT format.\n\n` +
+      `The data does not have valid PSBT magic bytes.\n` +
+      `Expected: 70736274ff (psbt + 0xff)`
     );
   }
 
@@ -80,13 +86,13 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     return outputError("Wallet public key not configured.");
   }
 
-  // Analyze inputs and find ones we can sign
+  // Analyze inputs
   const inputAnalysis: Array<{
     index: number;
     canSign: boolean;
     txid: string;
     vout: number;
-    amount?: bigint;
+    amount?: string;
     type: string;
   }> = [];
 
@@ -94,63 +100,78 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     index: number;
     sighash: string;
     leafHash?: string;
+    script?: Uint8Array;
   }> = [];
 
   for (let i = 0; i < tx.inputsLength; i++) {
     const input = tx.getInput(i);
     
-    const analysis: typeof inputAnalysis[0] = {
+    const analysis: (typeof inputAnalysis)[0] = {
       index: i,
       canSign: false,
       txid: input.txid ? hex.encode(input.txid) : 'unknown',
       vout: input.index ?? 0,
-      amount: input.witnessUtxo?.amount,
+      amount: input.witnessUtxo?.amount?.toString(),
       type: 'unknown',
     };
 
     // Check if this is a Taproot input we can sign
+    // tapLeafScript is array of [controlBlock, script] tuples
     if (input.tapLeafScript && input.tapLeafScript.length > 0) {
       analysis.type = 'taproot-script-path';
       
       // Check if our pubkey is in any of the leaf scripts
-      for (const leafScript of input.tapLeafScript) {
-        const scriptHex = hex.encode(leafScript.script).toLowerCase();
+      for (const leafEntry of input.tapLeafScript) {
+        // leafEntry is [controlBlock, script] tuple
+        const [controlBlock, script] = leafEntry;
+        if (!script) continue;
+        
+        const scriptHex = hex.encode(script).toLowerCase();
         if (scriptHex.includes(walletPubkey)) {
           analysis.canSign = true;
           
-          // Compute sighash for this input
-          // For Taproot script-path, we need the leaf script and prevouts
-          const prevOutScripts = [];
-          const amounts = [];
-          
-          for (let j = 0; j < tx.inputsLength; j++) {
-            const inp = tx.getInput(j);
-            if (inp.witnessUtxo) {
-              prevOutScripts.push(inp.witnessUtxo.script);
-              amounts.push(inp.witnessUtxo.amount);
-            }
-          }
-          
+          // Compute sighash for this input using btc-signer's built-in method
           try {
-            const sighashPreimage = (tx as any).preimageWitnessV1(
-              i,
-              prevOutScripts,
-              btc.SigHash.DEFAULT,
-              amounts,
-              undefined,
-              leafScript.script,
-              leafScript.leafVersion
-            );
+            // Get prevout data for all inputs
+            const prevOutScripts: Uint8Array[] = [];
+            const amounts: bigint[] = [];
             
-            inputsToSign.push({
-              index: i,
-              sighash: hex.encode(sighashPreimage),
-              leafHash: hex.encode(btc.taprootListToTree(
-                [{ script: leafScript.script, leafVersion: leafScript.leafVersion }]
-              ).hash),
-            });
+            for (let j = 0; j < tx.inputsLength; j++) {
+              const inp = tx.getInput(j);
+              if (inp.witnessUtxo) {
+                prevOutScripts.push(inp.witnessUtxo.script);
+                amounts.push(inp.witnessUtxo.amount);
+              }
+            }
+            
+            // Get leaf version from control block (first byte has version info)
+            const leafVersion = controlBlock.version ?? 0xc0;
+            
+            // Use the transaction's preimage method if available
+            // Otherwise fall back to manual computation
+            const txAny = tx as any;
+            if (typeof txAny.preimageWitnessV1 === 'function') {
+              const sighashBytes = txAny.preimageWitnessV1(
+                i,
+                prevOutScripts,
+                btc.SigHash.DEFAULT,
+                amounts,
+                undefined,
+                script,
+                leafVersion & 0xfe // Strip the parity bit
+              );
+              
+              // Compute leaf hash for tapScriptSig
+              const leafHash = tapLeafHash(script, leafVersion & 0xfe);
+              
+              inputsToSign.push({
+                index: i,
+                sighash: hex.encode(sighashBytes),
+                leafHash: hex.encode(leafHash),
+                script: script,
+              });
+            }
           } catch (err) {
-            // Sighash computation failed - might be missing data
             console.error(`Failed to compute sighash for input ${i}:`, err);
           }
           break;
@@ -158,11 +179,9 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
       }
     } else if (input.tapInternalKey) {
       analysis.type = 'taproot-key-path';
-      // Key-path spending - check if our pubkey matches internal key
       const internalPubkey = hex.encode(input.tapInternalKey).toLowerCase();
       if (internalPubkey === walletPubkey) {
         analysis.canSign = true;
-        // For key-path, sighash is simpler but still needs BIP-341 computation
       }
     }
 
@@ -172,38 +191,34 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
   // Analyze outputs
   const outputAnalysis: Array<{
     index: number;
-    address?: string;
-    amount: bigint;
+    amount: string;
   }> = [];
 
   for (let i = 0; i < tx.outputsLength; i++) {
     const output = tx.getOutput(i);
     outputAnalysis.push({
       index: i,
-      address: output.address,
-      amount: output.amount ?? 0n,
+      amount: (output.amount ?? 0n).toString(),
     });
   }
 
   // Calculate fee
-  const totalIn = inputAnalysis.reduce((sum, i) => sum + (i.amount ?? 0n), 0n);
-  const totalOut = outputAnalysis.reduce((sum, o) => sum + o.amount, 0n);
+  const totalIn = inputAnalysis.reduce((sum, i) => sum + BigInt(i.amount ?? 0), 0n);
+  const totalOut = outputAnalysis.reduce((sum, o) => sum + BigInt(o.amount), 0n);
   const fee = totalIn - totalOut;
 
-  // Display transaction summary
   const summary = {
     inputs: inputAnalysis.map(i => ({
       index: i.index,
       txid: i.txid.slice(0, 16) + '...',
       vout: i.vout,
-      amount: i.amount?.toString(),
+      amount: i.amount,
       type: i.type,
       canSign: i.canSign,
     })),
     outputs: outputAnalysis.map(o => ({
       index: o.index,
-      address: o.address,
-      amount: o.amount.toString(),
+      amount: o.amount,
     })),
     fee: fee.toString(),
     inputsWeCanSign: inputsToSign.length,
@@ -225,7 +240,6 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     signature: string;
   }> = [];
 
-  // Try daemon first
   const daemonUrl = getDaemonUrl();
   
   for (const input of inputsToSign) {
@@ -234,8 +248,8 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     if (daemonUrl) {
       try {
         const result = await daemonPost("/sign-digest", { digest: input.sighash });
-        signature = (result as any).signature;
-      } catch (err) {
+        signature = (result as { signature: string }).signature;
+      } catch {
         // Fall back to direct API
         const apiClient = new ClwApiClient(
           config.apiBaseUrl,
@@ -259,17 +273,19 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
       signature: signature.toLowerCase(),
     });
 
-    // Add signature to PSBT
-    try {
-      tx.updateInput(input.index, {
-        tapScriptSig: [{
-          pubKey: hex.decode(walletPubkey),
-          signature: hex.decode(signature),
-        }],
-      });
-    } catch (err) {
-      // Signature addition might fail if format is wrong
-      console.error(`Warning: Could not add signature to PSBT input ${input.index}`);
+    // Add signature to PSBT using tapScriptSig
+    if (input.leafHash) {
+      try {
+        const pubKeyBytes = hex.decode(walletPubkey);
+        const leafHashBytes = hex.decode(input.leafHash);
+        const sigBytes = hex.decode(signature);
+        
+        tx.updateInput(input.index, {
+          tapScriptSig: [[{ pubKey: pubKeyBytes, leafHash: leafHashBytes }, sigBytes]],
+        });
+      } catch (err) {
+        console.error(`Warning: Could not add signature to PSBT input ${input.index}:`, err);
+      }
     }
   }
 

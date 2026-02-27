@@ -33,12 +33,18 @@ RATE_LIMIT_PER_IDENTITY_SIGN = "20"
 ALLOWED_ORIGINS = "http://localhost:5173"
 ALLOW_TEST_AUTH = "true"
 
+# Cron Triggers
+# Sends a daily metrics digest to the admin Telegram chat at 08:00 UTC
+[triggers]
+crons = ["0 8 * * *"]
+
 # Secrets (set via: wrangler secret put <NAME>)
 # INTERNAL_API_KEY
 # TICKET_SIGNING_SECRET
 # SESSION_SIGNING_SECRET
 # TELEGRAM_BOT_TOKEN
 # TELEGRAM_BOT_USERNAME
+# TELEGRAM_ADMIN_CHAT_ID   ← your personal Telegram chat ID (find via @userinfobot)
 # EV_API_KEY
 
 # ── Production ──────────────────────────────────────────────
@@ -69,6 +75,9 @@ id = "419b8e6d63084afaaa245d9b3fb6faf7"
 [[env.production.kv_namespaces]]
 binding = "KV_RATE_LIMIT"
 id = "969b388a46454ae1886d8c37b3e54ee2"
+
+[env.production.triggers]
+crons = ["0 8 * * *"]
 
 # Custom domain — after first deploy, run:
 #   npx wrangler deploy --env production

@@ -1,5 +1,5 @@
 export function isBolt11(s: string): boolean {
-  return /^ln(bc|tb|bcrt)1/i.test(s);
+  return /^ln(bc|tb|bcrt)[a-z0-9]*1/i.test(s);
 }
 
 export function isBIP21(s: string): boolean {

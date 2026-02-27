@@ -17,6 +17,7 @@ import { handleSwap } from "./commands/swap.js";
 import { handleConfig } from "./commands/config.js";
 import { handleSignPsbt } from "./commands/sign-psbt.js";
 import { handlePubkey } from "./commands/pubkey.js";
+import { getVersion } from "./version.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
 
@@ -30,6 +31,7 @@ Usage:
   cash login                  Re-authenticate via Telegram (refresh token)
   cash skill                  Print SKILL.md (agent instructions)
   cash config                 Show resolved configuration and sources
+  cash version                Print CLI version
   cash start                  Start background daemon (swap monitoring)
   cash stop                   Stop background daemon
   cash status                 Show daemon status
@@ -90,8 +92,8 @@ if (argv["daemon-internal"]) {
     process.exit(0);
   }
 
-  if (argv.version) {
-    console.log("0.1.0");
+  if (argv.version || command === "version") {
+    console.log(getVersion());
     process.exit(0);
   }
 

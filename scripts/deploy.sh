@@ -42,12 +42,14 @@ generate_secrets() {
   # Preserve persistent values if .env.production.local already exists
   local existing_telegram_bot_token=""
   local existing_telegram_bot_username=""
+  local existing_telegram_admin_chat_id=""
   local existing_ev_api_key=""
   if [[ -f "$ENV_FILE" ]]; then
     existing_telegram_bot_token=$(grep -E '^TELEGRAM_BOT_TOKEN=' "$ENV_FILE" | cut -d= -f2- || true)
     existing_telegram_bot_username=$(grep -E '^TELEGRAM_BOT_USERNAME=' "$ENV_FILE" | cut -d= -f2- || true)
+    existing_telegram_admin_chat_id=$(grep -E '^TELEGRAM_ADMIN_CHAT_ID=' "$ENV_FILE" | cut -d= -f2- || true)
     existing_ev_api_key=$(grep -E '^EV_API_KEY=' "$ENV_FILE" | cut -d= -f2- || true)
-    warn "Preserving existing TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, EV_API_KEY"
+    warn "Preserving existing TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_ADMIN_CHAT_ID, EV_API_KEY"
   fi
 
   local ticket_secret
@@ -75,6 +77,7 @@ SESSION_SIGNING_SECRET=${session_secret}
 EV_API_KEY="${existing_ev_api_key}"
 TELEGRAM_BOT_TOKEN="${existing_telegram_bot_token}"
 TELEGRAM_BOT_USERNAME="${existing_telegram_bot_username}"
+TELEGRAM_ADMIN_CHAT_ID="${existing_telegram_admin_chat_id}"
 EOF
 
   chmod 600 "$ENV_FILE"
@@ -140,7 +143,7 @@ deploy_api() {
 
   # Set secrets on CF Worker
   info "Setting Worker secrets..."
-  local api_secrets=(INTERNAL_API_KEY TICKET_SIGNING_SECRET SESSION_SIGNING_SECRET EV_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_BOT_USERNAME)
+  local api_secrets=(INTERNAL_API_KEY TICKET_SIGNING_SECRET SESSION_SIGNING_SECRET EV_API_KEY TELEGRAM_BOT_TOKEN TELEGRAM_BOT_USERNAME TELEGRAM_ADMIN_CHAT_ID)
   for var in "${api_secrets[@]}"; do
     # Skip optional secrets if empty
     if [[ -z "${!var:-}" ]]; then

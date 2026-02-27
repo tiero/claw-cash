@@ -12,6 +12,7 @@ export interface Env {
   SESSION_SIGNING_SECRET: string;
   TELEGRAM_BOT_TOKEN: string;
   TELEGRAM_BOT_USERNAME: string;
+  TELEGRAM_ADMIN_CHAT_ID: string;
   EV_API_KEY: string;
 
   // Variables

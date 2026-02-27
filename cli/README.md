@@ -46,6 +46,7 @@ cash receive --amount 100000 --currency sats --where lightning
 | `cash swaps` | List swaps (last 5 per category) |
 | `cash claim <id>` | Manually claim a swap (reveal preimage) |
 | `cash refund <id>` | Manually refund a swap |
+| `cash pubkey` | Show the wallet's public key (for multisig setup) |
 | `cash sign-psbt <psbt>` | Sign a PSBT (Partially Signed Bitcoin Transaction) |
 
 ### Sign PSBT (Taproot Multisig Coordination)

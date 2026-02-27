@@ -189,6 +189,17 @@ cash balance
 # -> {"ok": true, "data": {"total": 250000, "offchain": {"settled": 50000, "preconfirmed": 20000, "available": 70000}, "onchain": {"confirmed": 30000, "total": 30000}}}
 ```
 
+### Public Key
+
+```bash
+# Get the wallet's x-only Taproot public key (for multisig script construction)
+cash pubkey
+# -> {"ok": true, "data": {"publicKey": "9350761ae700..."}}
+
+# Pipe into multisig tooling
+PUBKEY=$(cash pubkey | jq -r .data.publicKey)
+```
+
 ### Configuration
 
 ```bash

@@ -8,6 +8,15 @@ importers:
 
   .:
     devDependencies:
+      '@noble/secp256k1':
+        specifier: 3.0.0
+        version: 3.0.0
+      '@scure/base':
+        specifier: ^2.0.0
+        version: 2.0.0
+      '@scure/btc-signer':
+        specifier: ^2.0.1
+        version: 2.0.1
       vitest:
         specifier: ^4.0.18
         version: 4.0.18(@types/node@22.19.11)(tsx@4.21.0)
@@ -46,6 +55,12 @@ importers:
         specifier: ^0.0.2
         version: 0.0.2
       '@noble/hashes':
+        specifier: ^2.0.1
+        version: 2.0.1
+      '@scure/base':
+        specifier: ^2.0.0
+        version: 2.0.0
+      '@scure/btc-signer':
         specifier: ^2.0.1
         version: 2.0.1
       better-sqlite3:

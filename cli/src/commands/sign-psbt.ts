@@ -85,6 +85,13 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     return outputError("Wallet public key not configured.");
   }
 
+  // Tapscripts embed 32-byte x-only pubkeys; strip the parity prefix if config
+  // stores the 33-byte compressed key returned by the API (02/03 prefix).
+  const walletPubkeyRaw = hex.decode(walletPubkey);
+  const xOnlyPubkeyBytes = walletPubkeyRaw.length === 33
+    ? walletPubkeyRaw.slice(1)
+    : walletPubkeyRaw;
+
   // Analyze inputs
   const inputAnalysis: Array<{
     index: number;
@@ -126,14 +133,13 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
         if (!script) continue;
 
         // Check if our pubkey appears in the script as a proper push (0x20 prefix for 32-byte push)
-        const walletPubkeyBytes = hex.decode(walletPubkey);
         let foundPubkey = false;
 
-        // Look for 0x20 (OP_PUSHBYTES_32) followed by our pubkey
+        // Look for 0x20 (OP_PUSHBYTES_32) followed by our x-only pubkey
         for (let pos = 0; pos < script.length - 32; pos++) {
           if (script[pos] === 0x20) {
             const pushedData = script.slice(pos + 1, pos + 33);
-            if (pushedData.every((byte, idx) => byte === walletPubkeyBytes[idx])) {
+            if (pushedData.every((byte, idx) => byte === xOnlyPubkeyBytes[idx])) {
               foundPubkey = true;
               break;
             }
@@ -193,7 +199,7 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     } else if (input.tapInternalKey) {
       analysis.type = 'taproot-key-path';
       const internalPubkey = hex.encode(input.tapInternalKey).toLowerCase();
-      if (internalPubkey === walletPubkey) {
+      if (internalPubkey === hex.encode(xOnlyPubkeyBytes).toLowerCase()) {
         analysis.canSign = true;
       }
     }
@@ -287,7 +293,7 @@ export async function handleSignPsbt(_ctx: unknown, args: ParsedArgs): Promise<n
     // Add signature to PSBT using tapScriptSig
     if (input.leafHash) {
       try {
-        const pubKeyBytes = hex.decode(walletPubkey);
+        const pubKeyBytes = xOnlyPubkeyBytes;
         const leafHashBytes = hex.decode(input.leafHash);
         const sigBytes = hex.decode(signature);
 

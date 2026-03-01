@@ -30,11 +30,14 @@ vi.mock("../cli/src/daemonClient.js", () => ({
 }));
 
 vi.mock("@clw-cash/sdk", () => ({
-  ClwApiClient: vi.fn().mockImplementation(() => ({
-    signDigest: vi.fn().mockResolvedValue(
-      "e907831f80848d1069a5371b402410364bdf1c5f8307b0084c55f1ce2dca821525f66a4a85ea8b71e482a74f382d2ce5eee8fafa85d483339b1715e3a0ec6983"
-    ),
-  })),
+  // Must use a regular function (not arrow) so `new ClwApiClient(...)` works
+  ClwApiClient: vi.fn().mockImplementation(function() {
+    return {
+      signDigest: vi.fn().mockResolvedValue(
+        "e907831f80848d1069a5371b402410364bdf1c5f8307b0084c55f1ce2dca821525f66a4a85ea8b71e482a74f382d2ce5eee8fafa85d483339b1715e3a0ec6983"
+      ),
+    };
+  }),
   ClwApiError: class extends Error {
     statusCode: number;
     constructor(msg: string, code: number) {
@@ -247,6 +250,90 @@ describe("sign-psbt", () => {
       expect(shortSig.length).toBeLessThan(128);
       expect(longSig.length).toBeGreaterThan(128);
     });
+  });
+});
+
+describe("Compressed vs x-only pubkey handling", () => {
+  // Build a minimal PSBT with a CHECKSIG tapscript containing the given x-only pubkey.
+  // Uses the NUMS unspendable key as the internal key, matching how real 2-of-2 PSBTs
+  // are constructed (no key-path spending, script-path only).
+  function buildTapscriptPsbt(xOnlyKey: string): string {
+    const NUMS = hex.decode("50929b74c1a04954b78b4b6035e97a5e078a5a0f28ec96d547bfee9ace803ac0");
+    const xOnlyBytes = hex.decode(xOnlyKey);
+    const leafScript = new Uint8Array([0x20, ...xOnlyBytes, 0xac]); // PUSH32 key OP_CHECKSIG
+    const payment = btc.p2tr(NUMS, { script: leafScript });
+    const tx = new btc.Transaction();
+    tx.addInput({
+      txid: hex.decode("0000000000000000000000000000000000000000000000000000000000000001"),
+      index: 0,
+      witnessUtxo: { script: payment.script, amount: 10000n },
+      tapLeafScript: payment.tapLeafScript,
+      tapInternalKey: payment.tapInternalKey,
+    });
+    tx.addOutput({ script: payment.script, amount: 9000n });
+    return btoa(String.fromCharCode(...tx.toPSBT()));
+  }
+
+  it("canSign=true when config has 33-byte compressed key and tapscript has matching x-only key", async () => {
+    const { loadConfig } = await import("../cli/src/config.js");
+    const { outputError } = await import("../cli/src/output.js");
+    const { handleSignPsbt } = await import("../cli/src/commands/sign-psbt.js");
+
+    const xOnlyKey = "9350761ae700acd872510de161bca0b90b78ddc007936674b318be8a50c531b5";
+    // 33-byte compressed key — this is what the API returns and config.publicKey stores
+    const compressedKey = "02" + xOnlyKey;
+
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      apiBaseUrl: "https://api.test.com",
+      identityId: "test-identity",
+      sessionToken: "test-token",
+      publicKey: compressedKey,
+      arkServerUrl: "https://arkade.computer",
+      network: "bitcoin",
+    });
+
+    vi.mocked(outputError).mockClear();
+
+    // The signing API call may or may not be mocked depending on test environment.
+    // We only care that the pubkey was found; if the API mock is active, signing
+    // succeeds; if not, it throws a network error. Either way, outputError must
+    // NOT be called with "No inputs to sign".
+    try {
+      await handleSignPsbt({}, { _: ["sign-psbt", buildTapscriptPsbt(xOnlyKey)] });
+    } catch {}
+
+    // Before the fix: outputError("No inputs to sign") because 02+key ≠ x-only key.
+    // After the fix: parity prefix stripped → pubkey found in tapscript → signing attempted.
+    expect(outputError).not.toHaveBeenCalledWith(
+      expect.stringContaining("No inputs to sign")
+    );
+  });
+
+  it("still works when config stores a 32-byte x-only key (backward compat)", async () => {
+    const { loadConfig } = await import("../cli/src/config.js");
+    const { outputError } = await import("../cli/src/output.js");
+    const { handleSignPsbt } = await import("../cli/src/commands/sign-psbt.js");
+
+    const xOnlyKey = "9350761ae700acd872510de161bca0b90b78ddc007936674b318be8a50c531b5";
+
+    vi.mocked(loadConfig).mockReturnValueOnce({
+      apiBaseUrl: "https://api.test.com",
+      identityId: "test-identity",
+      sessionToken: "test-token",
+      publicKey: xOnlyKey,
+      arkServerUrl: "https://arkade.computer",
+      network: "bitcoin",
+    });
+
+    vi.mocked(outputError).mockClear();
+
+    try {
+      await handleSignPsbt({}, { _: ["sign-psbt", buildTapscriptPsbt(xOnlyKey)] });
+    } catch {}
+
+    expect(outputError).not.toHaveBeenCalledWith(
+      expect.stringContaining("No inputs to sign")
+    );
   });
 });
 

@@ -301,7 +301,7 @@ When switching a live deployment from enclave mode to worker mode, **existing id
 
 The API detects this automatically: `POST /v1/identities/:id/restore` returns **409** if the stored key is not in worker format.
 
-`cash init` (v0.1.27+) handles the 409 transparently:
+`cash init` (v0.1.28+) handles the 409 transparently:
 
 1. Detects the incompatible identity
 2. Calls `DELETE /v1/identities/:id` to mark it destroyed

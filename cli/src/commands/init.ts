@@ -64,7 +64,20 @@ async function restoreIdentity(config: CashConfig): Promise<void> {
   });
   if (!res.ok) {
     const text = await res.text();
-    throw new Error(`Failed to restore identity: ${text}`);
+    const err = new Error(`Failed to restore identity: ${text}`) as Error & { status: number };
+    err.status = res.status;
+    throw err;
+  }
+}
+
+async function destroyIdentity(config: CashConfig, identityId: string): Promise<void> {
+  try {
+    await fetch(`${config.apiBaseUrl}/v1/identities/${identityId}`, {
+      method: "DELETE",
+      headers: { authorization: `Bearer ${config.sessionToken}` },
+    });
+  } catch {
+    // best-effort
   }
 }
 
@@ -90,8 +103,24 @@ export async function handleInit(args: ParsedArgs): Promise<never> {
       const identity = existing.items[0];
       config.identityId = identity.id;
       config.publicKey = identity.public_key;
-      await restoreIdentity(config);
-      console.error(`Recovered existing identity: ${identity.id}`);
+      try {
+        await restoreIdentity(config);
+        console.error(`Recovered existing identity: ${identity.id}`);
+      } catch (err: any) {
+        if (err.status === 409) {
+          // Identity is incompatible (e.g. enclave-mode key in worker mode) — create a fresh one
+          console.error(`Existing identity incompatible with current signer mode, creating a new one...`);
+          await destroyIdentity(config, identity.id);
+          config.identityId = "";
+          config.publicKey = "";
+          const fresh = await ClwApiClient.createIdentity(config.apiBaseUrl, config.sessionToken);
+          config.identityId = fresh.id;
+          config.publicKey = fresh.public_key;
+          saveConfig(config);
+        } else {
+          throw err;
+        }
+      }
     } else {
       // No existing identities — create a new one
       const identity = await ClwApiClient.createIdentity(
@@ -103,7 +132,23 @@ export async function handleInit(args: ParsedArgs): Promise<never> {
     }
   } else {
     // Identity exists in config — ensure it's registered on the API (survives server restarts)
-    await restoreIdentity(config);
+    try {
+      await restoreIdentity(config);
+    } catch (err: any) {
+      if (err.status === 409) {
+        // Stale enclave-mode identity in local config — destroy it and create a fresh one
+        console.error(`Cached identity incompatible with current signer mode, creating a new one...`);
+        await destroyIdentity(config, config.identityId);
+        config.identityId = "";
+        config.publicKey = "";
+        const fresh = await ClwApiClient.createIdentity(config.apiBaseUrl, config.sessionToken);
+        config.identityId = fresh.id;
+        config.publicKey = fresh.public_key;
+        saveConfig(config);
+      } else {
+        throw err;
+      }
+    }
   }
 
   saveConfig(config);

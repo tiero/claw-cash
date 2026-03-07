@@ -4,7 +4,7 @@
 
 Bitcoin for AI Agents.
 
-Agents hold Bitcoin — the only money they can cryptographically verify. When they need to pay for something (APIs, stablecoins, inference), they swap BTC on the fly. Private keys live in hardware enclaves. One CLI for BTC, Lightning, Ark, and stablecoins.
+Agents hold Bitcoin — the only money they can cryptographically verify. When they need to pay for something (APIs, stablecoins, inference), they swap BTC on the fly. Private keys are managed by the API in one of two modes: a hardware-isolated Evervault Enclave (operator cannot read keys), or a pure Cloudflare Worker using AES-256-GCM encryption (cheaper, operator-trusted). One CLI for BTC, Lightning, Ark, and stablecoins.
 
 Works with any agent harness — [OpenClaw](https://openclaw.ai), Claude Code, or your own. Give your agent a wallet it can actually verify.
 
@@ -18,7 +18,7 @@ The swap infrastructure (LendaSwap + Boltz) and ECDSA signing are already in pla
 
 ## How it works
 
-```
+```text
 Agent ──► cash CLI ──► skills/ ──► sdk/ ──► clw.cash API ──► Enclave (secp256k1)
                                                 │
                                                 └── audit log, rate limits, 2FA via Telegram
@@ -26,9 +26,9 @@ Agent ──► cash CLI ──► skills/ ──► sdk/ ──► clw.cash API
 
 ## Layout
 
-```
-api/          Public-facing REST API (auth, identities, signing)
-enclave/      Signer service (runs inside Evervault Enclave)
+```text
+api/          Public-facing REST API (auth, identities, signing, worker-mode signer)
+enclave/      Signer service (runs inside Evervault Enclave — enclave mode only)
 sdk/          TypeScript SDK — RemoteSignerIdentity, API client, signing utils
 skills/       Bitcoin, Lightning, and Stablecoin skills (Ark, Boltz, LendaSwap)
 cli/          Agent-friendly CLI ("cash") — send, receive, balance
@@ -136,7 +136,7 @@ pnpm typecheck
 
 clw.cash acts as a **factory bot** — a backend service that other Telegram bots use to give their users Bitcoin wallets. Your bot authenticates with a shared API key and gets per-user sessions without any user-facing auth flow.
 
-### How it works
+### Factory bot flow
 
 ```text
 User (Telegram)           Your Bot                    clw.cash API          Enclave
@@ -206,7 +206,21 @@ const result = await bitcoin.send({ address: "ark1q...", amount: 1000 });
 | **Bot session** | Bot API key + `telegram_user_id` → instant JWT | Telegram bot serving many users |
 | **Test mode** | No `TELEGRAM_BOT_TOKEN` → auto-resolves | Local dev, CI |
 
-## Deploy to Evervault
+## Deploy
+
+See [docs/runbook.md](docs/runbook.md) for the full operator guide.
+
+### Worker mode (Cloudflare-only, no enclave)
+
+```bash
+# Generate a 32-byte AES-256 key for encrypting private keys at rest
+openssl rand -hex 32 | wrangler secret put WORKER_SEALING_KEY --env production
+
+# Set SIGNER_MODE = "worker" in api/wrangler.toml [env.production.vars], then:
+cd api && pnpm deploy:prod
+```
+
+### Enclave mode (Evervault, hardware-isolated)
 
 Install the [Evervault CLI](https://docs.evervault.com/cli), then:
 
@@ -214,11 +228,20 @@ Install the [Evervault CLI](https://docs.evervault.com/cli), then:
 # one-time: generate signing certs
 ev enclave cert new --output ./infra
 
-# build enclave image
+# build and deploy
 ev enclave build -v --output . -c ./infra/enclave.toml ./enclave
-
-# deploy
 ev enclave deploy -v --eif-path ./enclave.eif -c ./infra/enclave.toml
+
+# then deploy the API worker (SIGNER_MODE = "enclave")
+cd api && pnpm deploy:prod
+```
+
+Or use the deploy script:
+
+```bash
+./scripts/deploy.sh generate-secrets
+./scripts/deploy.sh enclave    # enclave mode: build + deploy enclave + API
+./scripts/deploy.sh worker-api # worker mode: deploy API only (no enclave needed)
 ```
 
 ## Roadmap

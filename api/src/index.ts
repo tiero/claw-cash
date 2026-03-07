@@ -6,6 +6,7 @@ import type { Env } from "./bindings.js";
 import { CloudflareStore } from "./store.js";
 import { KVRateLimiter } from "./rateLimit.js";
 import { EnclaveClient, EnclaveClientError } from "./enclaveClient.js";
+import * as workerSigner from "./workerSigner.js";
 import { signSessionToken, signTicketToken, verifySessionToken, verifyTicketToken } from "./auth.js";
 import {
   challengeRequestSchema,
@@ -50,6 +51,21 @@ function getLimiter(env: Env): KVRateLimiter {
 
 function getEnclave(env: Env): EnclaveClient {
   return new EnclaveClient(env.ENCLAVE_BASE_URL, env.INTERNAL_API_KEY, env.EV_API_KEY || undefined);
+}
+
+function isWorkerMode(env: Env): boolean {
+  return env.SIGNER_MODE === "worker";
+}
+
+function requireMasterKey(env: Env): string {
+  if (!env.WORKER_SEALING_KEY) throw new HTTPException(500, { message: "WORKER_SEALING_KEY secret not configured for worker mode" });
+  return env.WORKER_SEALING_KEY;
+}
+
+// Worker sealed keys are "{24 hex iv}:{variable hex ciphertext+tag}".
+// Enclave (Evervault) keys are opaque blobs that don't match this pattern.
+function isWorkerSealedKey(sealedKey: string): boolean {
+  return /^[0-9a-f]{24}:[0-9a-f]+$/.test(sealedKey);
 }
 
 async function currentUser(store: CloudflareStore, userId: string) {
@@ -210,7 +226,6 @@ app.post("/v1/identities", requireAuth, async (c) => {
   const auth = c.get("auth");
   const store = getStore(c.env);
   const limiter = getLimiter(c.env);
-  const enclave = getEnclave(c.env);
 
   const user = await currentUser(store, auth.sub);
   await enforceRate(limiter, `user:${user.id}:identity_create`, c.env);
@@ -219,11 +234,21 @@ app.post("/v1/identities", requireAuth, async (c) => {
   const identityId = crypto.randomUUID();
   const alg: SupportedAlg = body.alg ?? "secp256k1";
 
-  const generated = await enclave.generate(identityId, alg);
-  const exported = await enclave.exportKey(identityId);
-  await store.putBackup({ identity_id: identityId, alg: exported.alg, sealed_key: exported.sealed_key });
+  let publicKey: string;
+  if (isWorkerMode(c.env)) {
+    const masterKey = requireMasterKey(c.env);
+    const generated = await workerSigner.generateKey(masterKey);
+    await store.putBackup({ identity_id: identityId, alg, sealed_key: generated.sealedKey });
+    publicKey = generated.publicKey;
+  } else {
+    const enclave = getEnclave(c.env);
+    const generated = await enclave.generate(identityId, alg);
+    const exported = await enclave.exportKey(identityId);
+    await store.putBackup({ identity_id: identityId, alg: exported.alg, sealed_key: exported.sealed_key });
+    publicKey = generated.public_key;
+  }
 
-  const identity = await store.createIdentity({ id: identityId, user_id: user.id, alg, public_key: generated.public_key });
+  const identity = await store.createIdentity({ id: identityId, user_id: user.id, alg, public_key: publicKey });
   await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.create", metadata: { alg: identity.alg } });
 
   return c.json(identity, 201);
@@ -233,21 +258,35 @@ app.post("/v1/identities/:id/restore", requireAuth, async (c) => {
   const auth = c.get("auth");
   const identityId = c.req.param("id");
   const store = getStore(c.env);
-  const enclave = getEnclave(c.env);
 
   const user = await currentUser(store, auth.sub);
 
   const existing = await store.getIdentity(identityId);
   if (existing) {
     if (existing.user_id !== user.id) throw new HTTPException(403, { message: "Identity does not belong to session user" });
-    await restoreBackup(store, enclave, identityId);
+    if (isWorkerMode(c.env)) {
+      const backup = await store.getBackup(identityId);
+      if (backup && !isWorkerSealedKey(backup.sealed_key)) {
+        throw new HTTPException(409, { message: "Identity was created in enclave mode and cannot be used in worker mode. Please create a new identity." });
+      }
+    } else {
+      const enclave = getEnclave(c.env);
+      await restoreBackup(store, enclave, identityId);
+    }
     return c.json(existing);
   }
 
   const backup = await store.getBackup(identityId);
   if (!backup) throw new HTTPException(404, { message: "No backup found for this identity" });
 
-  await enclave.importKey(identityId, backup.alg, stripWrappingQuotes(backup.sealed_key));
+  if (isWorkerMode(c.env)) {
+    if (!isWorkerSealedKey(backup.sealed_key)) {
+      throw new HTTPException(409, { message: "Identity was created in enclave mode and cannot be used in worker mode. Please create a new identity." });
+    }
+  } else {
+    const enclave = getEnclave(c.env);
+    await enclave.importKey(identityId, backup.alg, stripWrappingQuotes(backup.sealed_key));
+  }
 
   const body = (await c.req.json()) as { public_key?: string };
   if (!body.public_key) throw new HTTPException(400, { message: "Missing public_key in request body" });
@@ -292,7 +331,6 @@ app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
   const identityId = c.req.param("id");
   const store = getStore(c.env);
   const limiter = getLimiter(c.env);
-  const enclave = getEnclave(c.env);
 
   const user = await currentUser(store, auth.sub);
   const identity = await ownedActiveIdentity(store, identityId, user.id);
@@ -314,14 +352,22 @@ app.post("/v1/identities/:id/sign", requireAuth, async (c) => {
   if (new Date(ticket.expires_at).getTime() <= Date.now()) throw new HTTPException(410, { message: "Ticket expired" });
 
   let signature: string;
-  try {
-    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
-  } catch (error) {
-    if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
-    if (!(await restoreBackup(store, enclave, identity.id))) {
-      throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
+  if (isWorkerMode(c.env)) {
+    const masterKey = requireMasterKey(c.env);
+    const backup = await store.getBackup(identity.id);
+    if (!backup) throw new HTTPException(409, { message: "No key backup found" });
+    signature = await workerSigner.signDigest(backup.sealed_key, masterKey, digest);
+  } else {
+    const enclave = getEnclave(c.env);
+    try {
+      signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
+    } catch (error) {
+      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+      if (!(await restoreBackup(store, enclave, identity.id))) {
+        throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
+      }
+      signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
     }
-    signature = (await enclave.sign(identity.id, digest, body.ticket)).signature;
   }
 
   await store.markTicketUsed(ticket.id);
@@ -335,7 +381,6 @@ app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
   const identityId = c.req.param("id");
   const store = getStore(c.env);
   const limiter = getLimiter(c.env);
-  const enclave = getEnclave(c.env);
 
   const user = await currentUser(store, auth.sub);
   const identity = await ownedActiveIdentity(store, identityId, user.id);
@@ -345,34 +390,55 @@ app.post("/v1/identities/:id/sign-batch", requireAuth, async (c) => {
   const ticketTtl = parseInt(c.env.TICKET_TTL_SECONDS, 10);
   const signatures: string[] = [];
 
-  for (const item of body.digests) {
-    const digest = normalizeDigestHex(item.digest);
-    const digestHash = await CloudflareStore.digestHash(digest);
-    const nonce = crypto.randomUUID();
-    const ticketId = crypto.randomUUID();
-
-    const ticket = await signTicketToken(
-      { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
-      c.env.TICKET_SIGNING_SECRET,
-      ticketTtl,
-    );
-
-    const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
-    await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
-
-    let signature: string;
-    try {
-      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
-    } catch (error) {
-      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
-      if (!(await restoreBackup(store, enclave, identity.id))) {
-        throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
-      }
-      signature = (await enclave.sign(identity.id, digest, ticket)).signature;
+  // Worker mode: fetch backup once for all digests
+  let workerBackupSealedKey: string | null = null;
+  if (isWorkerMode(c.env)) {
+    const masterKey = requireMasterKey(c.env);
+    const backup = await store.getBackup(identity.id);
+    if (!backup) throw new HTTPException(409, { message: "No key backup found" });
+    workerBackupSealedKey = backup.sealed_key;
+    // masterKey captured in closure below
+    for (const item of body.digests) {
+      const digest = normalizeDigestHex(item.digest);
+      const digestHash = await CloudflareStore.digestHash(digest);
+      const ticketId = crypto.randomUUID();
+      const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
+      await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce: crypto.randomUUID() }, ticketTtl);
+      const signature = await workerSigner.signDigest(workerBackupSealedKey, masterKey, digest);
+      await store.markTicketUsed(ticketId);
+      signatures.push(signature);
     }
+  } else {
+    const enclave = getEnclave(c.env);
+    for (const item of body.digests) {
+      const digest = normalizeDigestHex(item.digest);
+      const digestHash = await CloudflareStore.digestHash(digest);
+      const nonce = crypto.randomUUID();
+      const ticketId = crypto.randomUUID();
 
-    await store.markTicketUsed(ticketId);
-    signatures.push(signature);
+      const ticket = await signTicketToken(
+        { jti: ticketId, sub: user.id, identity_id: identity.id, digest_hash: digestHash, scope: "sign", nonce },
+        c.env.TICKET_SIGNING_SECRET,
+        ticketTtl,
+      );
+
+      const expiresAt = new Date(Date.now() + ticketTtl * 1000).toISOString();
+      await store.createTicket({ id: ticketId, identity_id: identity.id, digest_hash: digestHash, scope: "sign", expires_at: expiresAt, nonce }, ticketTtl);
+
+      let signature: string;
+      try {
+        signature = (await enclave.sign(identity.id, digest, ticket)).signature;
+      } catch (error) {
+        if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+        if (!(await restoreBackup(store, enclave, identity.id))) {
+          throw new HTTPException(409, { message: "Key not present in enclave and no backup available" });
+        }
+        signature = (await enclave.sign(identity.id, digest, ticket)).signature;
+      }
+
+      await store.markTicketUsed(ticketId);
+      signatures.push(signature);
+    }
   }
 
   await store.addAuditEvent({ user_id: user.id, identity_id: identity.id, action: "identity.sign", metadata: { batch_size: body.digests.length } });
@@ -385,18 +451,20 @@ app.delete("/v1/identities/:id", requireAuth, async (c) => {
   const identityId = c.req.param("id");
   const store = getStore(c.env);
   const limiter = getLimiter(c.env);
-  const enclave = getEnclave(c.env);
 
   const user = await currentUser(store, auth.sub);
   const identity = await ownedActiveIdentity(store, identityId, user.id);
   await enforceRate(limiter, `identity:${identity.id}:destroy`, c.env);
 
-  try {
-    await enclave.destroy(identity.id);
-  } catch (error) {
-    if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
-    if (await restoreBackup(store, enclave, identity.id)) {
+  if (!isWorkerMode(c.env)) {
+    const enclave = getEnclave(c.env);
+    try {
       await enclave.destroy(identity.id);
+    } catch (error) {
+      if (!(error instanceof EnclaveClientError) || error.statusCode !== 404) throw error;
+      if (await restoreBackup(store, enclave, identity.id)) {
+        await enclave.destroy(identity.id);
+      }
     }
   }
 

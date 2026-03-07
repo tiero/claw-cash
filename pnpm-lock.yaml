@@ -23,6 +23,12 @@ importers:
 
   api:
     dependencies:
+      '@noble/hashes':
+        specifier: ^1.6.0
+        version: 1.8.0
+      '@noble/secp256k1':
+        specifier: 3.0.0
+        version: 3.0.0
       hono:
         specifier: ^4.7.0
         version: 4.11.9

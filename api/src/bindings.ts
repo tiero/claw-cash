@@ -18,6 +18,10 @@ export interface Env {
   // Variables
   ALLOW_TEST_AUTH: string;
   ENCLAVE_BASE_URL: string;
+  SIGNER_MODE: string; // "enclave" (default) | "worker"
+
+  // Secrets (worker mode only)
+  WORKER_SEALING_KEY: string; // 32-byte hex AES-256 master key for encrypting private keys
   TICKET_TTL_SECONDS: string;
   SESSION_TTL_SECONDS: string;
   CHALLENGE_TTL_SECONDS: string;

@@ -70,6 +70,7 @@
       </button>
       <ul class="nav-links">
         <li><a href="#how-it-works">How It Works</a></li>
+        <li><a href="#mpp">MPP</a></li>
         <li><a href="#security">Security</a></li>
         <li><a href="#use-cases">Use Cases</a></li>
         <li><a href="#roadmap">Roadmap</a></li>
@@ -179,6 +180,9 @@
 
 <span class="comment"># Pay a human via Lightning</span>
 <span class="cmd">cash</span> send <span class="value">lnbc500n1...</span>
+
+<span class="comment"># Pay any MPP-enabled API — auto-detects 402, pays, retries</span>
+<span class="cmd">cash</span> pay <span class="value">https://api.example.com/v1/generate</span>
         </div>
       </div>
     </div>
@@ -238,6 +242,77 @@
             <div class="pay-footer-mock">powered by <strong>Arkade</strong></div>
           </div>
           <div class="payment-label"><strong>Pay request</strong> — human connects wallet and sends stablecoins</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MPP -->
+  <section id="mpp">
+    <div class="container">
+      <div class="badge" style="margin-bottom: 16px;">
+        <span>⚡</span> Machine Payments Protocol
+      </div>
+      <h2>Pay Any API.<br>No API Keys Required.</h2>
+      <p class="section-lead">
+        MPP is an open standard (co-authored by Stripe and Tempo) for machine-to-machine payments over HTTP.
+        When a service returns <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">402 Payment Required</code>,
+        <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay</code> handles the challenge, pays the Lightning invoice, and retries — automatically.
+      </p>
+
+      <div class="code-section" style="max-width: 700px; margin: 40px auto;">
+        <div class="code-header">
+          <div class="code-dots"><span></span><span></span><span></span></div>
+          terminal
+        </div>
+        <div class="code-body">
+<span class="comment"># One command. Automatic payment. No API key.</span>
+<span class="cmd">cash</span> pay <span class="value">https://api.example.com/v1/generate</span>
+
+<span class="comment"># POST with a body</span>
+<span class="cmd">cash</span> pay <span class="value">https://api.example.com/v1/chat</span> <span class="flag">--method</span> <span class="value">POST</span> <span class="flag">--body</span> <span class="value">'{"prompt":"hello"}'</span>
+
+<span class="comment"># Output — paid: true, proof via Lightning preimage</span>
+<span class="value">{"ok":true,"data":{"status":200,"paid":true,"method":"lightning","preimage":"abcdef..."}}</span>
+        </div>
+      </div>
+
+      <div class="flow" style="margin-top: 48px;">
+        <div class="flow-step">
+          <div class="step-num">01</div>
+          <div>
+            <h3>Service returns 402</h3>
+            <p>The API responds with <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#1a1a1a;padding:2px 6px;border-radius:4px;color:var(--orange)">WWW-Authenticate: Payment method="lightning"</code> — a Lightning invoice encoded in the challenge.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">02</div>
+          <div>
+            <h3>Agent pays from BTC treasury</h3>
+            <p>Claw Cash pays the BOLT11 invoice instantly from the agent's sats. No stablecoin swap needed — Lightning is native.</p>
+          </div>
+        </div>
+        <div class="flow-step">
+          <div class="step-num">03</div>
+          <div>
+            <h3>Retry with cryptographic proof</h3>
+            <p>The payment preimage is submitted as <code style="font-family:'JetBrains Mono',monospace;font-size:13px;background:#1a1a1a;padding:2px 6px;border-radius:4px;color:var(--orange)">Authorization: Payment</code>. The service verifies on-chain and returns the resource.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="verify-grid" style="margin-top: 48px;">
+        <div class="verify-item">
+          <h4>// Open Standard</h4>
+          <p>IETF draft <code style="font-family:'JetBrains Mono',monospace;font-size:12px">draft-httpauth-payment-00</code>. Co-authored by Stripe and Tempo. Any service can implement it — no vendor lock-in.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Lightning-Native</h4>
+          <p>No BTC→stablecoin swap required. The agent pays Lightning invoices directly from its BTC treasury. Instant, cheap, final.</p>
+        </div>
+        <div class="verify-item">
+          <h4>// Cryptographic Proof</h4>
+          <p>The Lightning preimage is unforgeable proof of payment — mathematically verifiable by both sides. No trust in an intermediary.</p>
         </div>
       </div>
     </div>
@@ -357,6 +432,10 @@
           <h3><span>🧠</span> Pay for Inference</h3>
           <p>Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy compute—paying for the thinking they need, on demand.</p>
         </div>
+        <div class="usecase-card">
+          <h3><span>⚡</span> Pay MPP APIs</h3>
+          <p>Call any MPP-enabled API with <code style="font-family:'JetBrains Mono',monospace;font-size:12px;background:#1a1a1a;padding:2px 5px;border-radius:3px">cash pay &lt;url&gt;</code>. Auto-pays the Lightning challenge. No API keys, no billing accounts.</p>
+        </div>
       </div>
     </div>
   </section>
@@ -375,9 +454,14 @@
           <p>Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.</p>
         </div>
         <div class="roadmap-card">
+          <div class="roadmap-tag now">NOW</div>
+          <h3>MPP Client — <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay</code></h3>
+          <p>Machine Payments Protocol support. <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay &lt;url&gt;</code> auto-detects the <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">WWW-Authenticate: Payment</code> challenge, pays via Lightning, and retries with cryptographic proof.</p>
+        </div>
+        <div class="roadmap-card">
           <div class="roadmap-tag next">NEXT</div>
-          <h3>x402 Client Support</h3>
-          <p><code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay &lt;url&gt;</code> command. Detect <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">402 Payment Required</code>, auto-swap BTC to stablecoins, retry with proof. Blocked on x402 facilitators outside USDC on Base.</p>
+          <h3>MPP Tempo Chain</h3>
+          <p>Native settlement on the Tempo blockchain (chain ID 42431) for MPP services requiring TIP-20 token payments — expanding <code style="font-family: 'JetBrains Mono', monospace; font-size: 13px; background: #1a1a1a; padding: 2px 6px; border-radius: 4px; color: var(--orange);">cash pay</code> beyond Lightning.</p>
         </div>
         <div class="roadmap-card">
           <div class="roadmap-tag next">NEXT</div>
@@ -453,9 +537,9 @@
           </div>
         </details>
         <details class="faq-item">
-          <summary>Is x402 payment supported?</summary>
+          <summary>Does <code>cash pay</code> support MPP?</summary>
           <div class="faq-answer">
-            Not yet. x402 is on the roadmap but blocked on the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support <code>cash pay &lt;url&gt;</code> with automatic BTC→stablecoin swaps.
+            Yes — <code>cash pay &lt;url&gt;</code> is live. It implements the IETF Machine Payments Protocol (<code>draft-httpauth-payment-00</code>), co-authored by Stripe and Tempo. When a service returns <code>WWW-Authenticate: Payment method="lightning"</code>, Claw Cash pays the BOLT11 invoice from the agent's BTC treasury and retries with the preimage as cryptographic proof. No API key, no billing account. Supported method: <code>lightning</code>. Tempo chain support is next on the roadmap.
           </div>
         </details>
         <details class="faq-item">

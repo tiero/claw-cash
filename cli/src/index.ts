@@ -17,6 +17,7 @@ import { handleSwap } from "./commands/swap.js";
 import { handleConfig } from "./commands/config.js";
 import { handleSignPsbt } from "./commands/sign-psbt.js";
 import { handlePubkey } from "./commands/pubkey.js";
+import { handlePay } from "./commands/pay.js";
 import { getVersion } from "./version.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
@@ -42,6 +43,10 @@ Usage:
   cash claim <swapId>           Manually claim a swap (reveal preimage)
   cash refund <swapId>          Manually refund a swap
     --address <destination>     Refund destination (optional)
+  cash pay <url>                 Fetch a URL, auto-pay MPP 402 challenges (BTC→stablecoin)
+    --method <GET|POST>           HTTP method (default: GET)
+    --body <json>                 Request body (for POST/PUT/PATCH)
+    --header 'Name: value'        Custom request headers (repeatable)
   cash pubkey                   Show the wallet's public key (for multisig setup)
   cash sign-psbt <base64>       Sign a PSBT (Partially Signed Bitcoin Transaction)
                                 Parses PSBT, shows tx details, signs inputs
@@ -75,7 +80,7 @@ const argv = minimist(process.argv.slice(2), {
   string: [
     "amount", "currency", "where", "to", "address", "id",
     "api-url", "token", "ark-server", "network", "port",
-    "bot-token", "chat-id", "message-id",
+    "bot-token", "chat-id", "message-id", "method", "body", "header",
   ],
   boolean: ["help", "version", "daemon-internal", "start"],
   alias: { h: "help", v: "version" },
@@ -178,6 +183,9 @@ async function main() {
         break;
       case "sign-psbt":
         await handleSignPsbt(ctx, argv);
+        break;
+      case "pay":
+        await handlePay(ctx, argv);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

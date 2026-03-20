@@ -2,7 +2,7 @@ import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
 import { RemoteSignerIdentity } from "@clw-cash/sdk";
-import { Wallet } from "@arkade-os/sdk";
+import { Wallet, RestDelegatorProvider } from "@arkade-os/sdk";
 import { FileSystemStorageAdapter } from "@arkade-os/sdk/adapters/fileSystem";
 import {
   SqliteWalletStorage,
@@ -46,6 +46,9 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
     identity,
     arkServerUrl: config.arkServerUrl,
     storage: walletStorage,
+    ...(config.delegatorUrl
+      ? { delegatorProvider: new RestDelegatorProvider(config.delegatorUrl) }
+      : {}),
   });
 
   const bitcoin = new ArkadeBitcoinSkill(wallet);

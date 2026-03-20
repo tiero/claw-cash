@@ -18,6 +18,7 @@ import { handleConfig } from "./commands/config.js";
 import { handleSignPsbt } from "./commands/sign-psbt.js";
 import { handlePubkey } from "./commands/pubkey.js";
 import { handlePay } from "./commands/pay.js";
+import { handleDelegate } from "./commands/delegate.js";
 import { getVersion } from "./version.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
@@ -47,6 +48,7 @@ Usage:
     --method <GET|POST>           HTTP method (default: GET)
     --body <json>                 Request body (for POST/PUT/PATCH)
     --header 'Name: value'        Custom request headers (repeatable)
+  cash delegate                 Delegate settled VTXOs to the configured delegate service (auto-renewal)
   cash pubkey                   Show the wallet's public key (for multisig setup)
   cash sign-psbt <base64>       Sign a PSBT (Partially Signed Bitcoin Transaction)
                                 Parses PSBT, shows tx details, signs inputs
@@ -74,6 +76,7 @@ Environment:
   CLW_ARK_SERVER_URL   Arkade server URL
   CLW_NETWORK          Network (bitcoin|testnet)
   CLW_DAEMON_PORT      Daemon port (default: 3457)
+  CLW_DELEGATOR_URL    Delegator service URL (e.g. https://delegate.arkade.money)
 `;
 
 const argv = minimist(process.argv.slice(2), {
@@ -186,6 +189,9 @@ async function main() {
         break;
       case "pay":
         await handlePay(ctx, argv);
+        break;
+      case "delegate":
+        await handleDelegate(ctx);
         break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);

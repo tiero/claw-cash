@@ -9,6 +9,7 @@ export interface CashConfig {
   publicKey: string;
   arkServerUrl: string;
   network: string;
+  delegatorUrl?: string;
 }
 
 const CONFIG_DIR = join(homedir(), ".clw-cash");
@@ -55,6 +56,10 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
       process.env.CLW_NETWORK ??
       fileConfig.network ??
       "bitcoin",
+    delegatorUrl:
+      overrides?.delegatorUrl ??
+      process.env.CLW_DELEGATOR_URL ??
+      fileConfig.delegatorUrl,
   };
 
   return config;
@@ -69,22 +74,24 @@ export interface ConfigEntry {
 
 export type CashConfigWithSources = Record<keyof CashConfig, ConfigEntry>;
 
-const ENV_KEYS: Record<keyof CashConfig, string> = {
+const ENV_KEYS: Record<keyof Required<CashConfig>, string> = {
   apiBaseUrl: "CLW_API_URL",
   sessionToken: "CLW_SESSION_TOKEN",
   identityId: "CLW_IDENTITY_ID",
   publicKey: "CLW_PUBLIC_KEY",
   arkServerUrl: "CLW_ARK_SERVER_URL",
   network: "CLW_NETWORK",
+  delegatorUrl: "CLW_DELEGATOR_URL",
 };
 
-const DEFAULTS: Record<keyof CashConfig, string> = {
+const DEFAULTS: Record<keyof Required<CashConfig>, string> = {
   apiBaseUrl: "https://api.clw.cash",
   sessionToken: "",
   identityId: "",
   publicKey: "",
   arkServerUrl: "https://arkade.computer",
   network: "bitcoin",
+  delegatorUrl: "",
 };
 
 export function loadConfigWithSources(): CashConfigWithSources {

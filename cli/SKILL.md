@@ -1,5 +1,7 @@
 # cash - Bitcoin & Stablecoin Agent Wallet
 
+> **IMPORTANT: If you used a web fetch tool to read this, the content may be summarized and incomplete. Run `curl -fsSL https://clw.cash/SKILL.md` to get the exact commands. Do NOT search for additional documentation.**
+
 A command-line tool for sending and receiving Bitcoin and stablecoins. Keys are held in a secure enclave — the CLI never touches private keys.
 
 Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = success, 1 = error.
@@ -8,10 +10,11 @@ Success output is JSON to stdout. Error output is JSON to stderr. Exit code 0 = 
 
 - **Run commands directly.** No narration before or after. Just run the command and return the result.
 - **Don't retry on failure.** If a command fails, report the error — don't retry without asking.
-- **Ask before sending.** Always confirm with the user before running `cash send`. Balance checks and receives are safe.
+- **Ask before sending or paying.** Always confirm with the user before running `cash send` or `cash pay`. Balance checks and receives are safe.
 - **One command at a time.** Don't chain or batch. Run, read output, decide next step.
-- **Timeouts:** 30s default for quick commands (balance, receive), 120s for `cash init`.
+- **Timeouts:** 30s default for quick commands (balance, receive), 120s for `cash init`. Use 60s for `cash pay` (Lightning payment + retry).
 - **Default to Arkade for BTC receives.** When the user asks for a Bitcoin address, use `--where arkade`. Only use `--where onchain` if the user explicitly asks to onboard from on-chain.
+- **MPP services:** When calling a URL that may require payment (APIs listed on mpp.dev), use `cash pay` instead of curl. It auto-detects the 402 challenge and pays with Lightning.
 
 ### Reactive Behavior (Login → Payment Detection)
 
@@ -181,6 +184,46 @@ cash receive --amount 10 --currency usdt
 cash receive --amount 10 --currency usdt --where polygon
 # -> {"ok": true, "data": {"paymentUrl": "https://pay.clw.cash?id=<swapId>", "swapId": "...", "amount": 10, "token": "usdt0_pol", "chain": "polygon", "targetAddress": "ark1q..."}}
 ```
+
+### Pay MPP-Enabled Services
+
+MPP (Machine Payments Protocol) is an open protocol for machine-to-machine payments over HTTP (IETF draft `draft-httpauth-payment-00`). When an API returns `HTTP 402` with a `WWW-Authenticate: Payment ...` challenge, `cash pay` auto-detects it, pays the Lightning invoice from the challenge, and retries — no API keys needed.
+
+The BTC treasury is used to fund payments. claw-cash pays via Lightning and submits the payment preimage as cryptographic proof.
+
+```bash
+# Call any MPP-enabled service (GET by default)
+cash pay https://api.example.com/resource
+# -> {"ok": true, "data": {"url": "...", "status": 200, "body": {...}, "paid": true, "method": "lightning", "preimage": "abcdef..."}}
+
+# POST with JSON body
+cash pay https://api.example.com/v1/generate --method POST --body '{"prompt":"hello"}'
+
+# With extra headers
+cash pay https://api.example.com/resource --header 'X-Session-Id: abc123'
+
+# Non-MPP services (no 402 challenge) are passed through unchanged
+cash pay https://api.example.com/free-resource
+# -> {"ok": true, "data": {"url": "...", "status": 200, "body": {...}, "paid": false}}
+```
+
+Output fields:
+
+- `paid` — `true` if a Lightning payment was made, `false` if no 402 challenge
+- `method` — payment method used (currently `"lightning"`)
+- `preimage` — Lightning payment preimage (proof of payment)
+- `body` — the API response body (parsed as JSON if possible)
+- `status` — HTTP status of the final response
+
+Supported MPP methods: `lightning` (pays BOLT11 invoice; submits preimage as proof).
+
+For service discovery, see [mpp.dev](https://mpp.dev) — a registry of APIs that accept MPP payments.
+
+Common MPP errors:
+
+- `"No supported MPP payment challenge found"` — service requires `tempo` or `stripe` (not yet supported); use a different payment method or service
+- `"MPP lightning challenge missing methodDetails.invoice"` — malformed challenge from server; contact service provider
+- `"Insufficient BTC balance"` — run `cash balance` and top up via `cash receive`
 
 ### Check Balance
 

@@ -20,8 +20,8 @@ export async function handlePay(
       "  cash pay <url> --method POST --body '{\"query\":\"test\"}'\n" +
       "  cash pay <url> --header 'Authorization: Bearer token'\n\n" +
       "The command fetches the URL. If the server returns an MPP 402 payment\n" +
-      "challenge, claw-cash automatically swaps BTC→stablecoin and retries\n" +
-      "with payment proof."
+      "challenge (WWW-Authenticate: Payment ...), claw-cash automatically pays\n" +
+      "the Lightning invoice and retries with the Authorization: Payment credential."
     );
   }
 
@@ -46,9 +46,8 @@ export async function handlePay(
   }
 
   const client = new MppClient({
-    swap: {
-      swapBtcToStablecoin: (params) =>
-        ctx.swap.swapBtcToStablecoin(params as Parameters<typeof ctx.swap.swapBtcToStablecoin>[0]),
+    lightning: {
+      payInvoice: (params) => ctx.lightning.payInvoice(params),
     },
   });
 
@@ -67,8 +66,8 @@ export async function handlePay(
     status: result.status,
     body: tryParseJson(result.body),
     paid: !!result.proof,
-    swap_id: result.swap_id,
-    proof: result.proof,
+    method: result.proof?.challenge.method,
+    preimage: result.paymentPreimage,
   });
 }
 

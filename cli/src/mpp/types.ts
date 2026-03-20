@@ -1,130 +1,117 @@
 /**
  * MPP (Machine Payments Protocol) types.
  *
- * MPP is an open protocol for machine-to-machine payments co-authored by
- * Stripe and Tempo.  It uses the HTTP 402 challenge-then-retry pattern:
+ * MPP uses the IETF "Payment" HTTP Authentication Scheme (draft-httpauth-payment-00).
+ * See: https://paymentauth.org
  *
+ * Protocol flow:
  *   1. Client requests a resource.
- *   2. Server responds 402 with `MPP-Version` + JSON body containing payment
- *      requirements (amount, currency, recipient, network, optional session).
- *   3. Client pays (BTC→stablecoin swap via claw-cash infrastructure) and
- *      retries with an `MPP-Authorization` header carrying the payment proof.
+ *   2. Server responds 402 with `WWW-Authenticate: Payment id="...", method="...", ...`
+ *      The `request` param is base64url-encoded JCS JSON with method-specific payment data.
+ *   3. Client pays (e.g., Lightning invoice) and retries with:
+ *      `Authorization: Payment <base64url(JCS JSON of {challenge, source?, payload})>`
  *   4. Server verifies and returns the resource.
  *
- * Sessions ("OAuth for money") let the client authorize once and stream
- * payments within defined limits.
+ * Supported payment methods:
+ *   - "lightning": client pays BOLT11 invoice and submits the preimage as proof
+ *   - "tempo": Tempo chain (ID 42431) — not yet supported by claw-cash swap infrastructure
+ *   - "stripe", "card": not supported (card-based, not BTC)
  */
 
-// ── Protocol constants ─────────────────────────────────
+// ── Challenge (from WWW-Authenticate: Payment header) ──────────────
 
-export const MPP_VERSION = "1";
-
-export const MPP_HEADER_VERSION = "MPP-Version";
-export const MPP_HEADER_AUTHORIZATION = "MPP-Authorization";
-
-// ── Payment requirements (server → client on 402) ─────
-
-export interface MppPaymentRequirement {
-  /** Unique id for this requirement set */
+export interface MppChallenge {
+  /** Unique challenge identifier (HMAC-SHA256 of slots, base64url-encoded) */
   id: string;
-  /** Payment amount in the smallest unit of the currency (e.g. cents for USD) */
-  amount: number;
-  /** ISO 4217 currency code — typically "USD" */
-  currency: string;
-  /** Recipient address on the target network */
-  recipient: string;
-  /** Network/rail to settle on — e.g. "tempo", "polygon", "ethereum", "base" */
-  network: string;
-  /** Human-readable description of the resource being purchased */
+  /** Protection space identifier (typically the API hostname) */
+  realm: string;
+  /** Payment method: "lightning", "tempo", "stripe", "card" */
+  method: string;
+  /** Payment intent: "charge" (one-shot) or "session" (channel) */
+  intent: string;
+  /** base64url-encoded (no padding) JCS JSON with method-specific payment data */
+  request: string;
+  /** Optional: RFC3339 expiry timestamp */
+  expires?: string;
+  /** Optional: human-readable description (display only) */
   description?: string;
-  /** Optional: expiry timestamp (ISO 8601) for the payment requirement */
-  expires_at?: string;
-  /** Optional: session id if the server supports MPP sessions */
-  session_id?: string;
+  /** Optional: opaque base64url value — must be echoed back in credential */
+  opaque?: string;
 }
 
-export interface MppPaymentRequired {
-  /** Protocol version */
-  version: string;
-  /** One or more acceptable payment options */
-  requirements: MppPaymentRequirement[];
+// ── Method-specific request data (decoded from challenge.request) ───
+
+/** Lightning charge request (method="lightning", intent="charge") */
+export interface LightningChargeRequest {
+  /** Stringified integer satoshis */
+  amount: string;
+  currency: "sat";
+  description?: string;
+  methodDetails: {
+    /** BOLT11 invoice to pay */
+    invoice: string;
+  };
 }
 
-// ── Payment proof (client → server on retry) ───────────
-
-export interface MppPaymentProof {
-  /** Protocol version */
-  version: string;
-  /** The requirement id the client chose to fulfill */
-  requirement_id: string;
-  /** On-chain transaction id / swap id proving payment */
-  tx_id: string;
-  /** Network the payment was settled on */
-  network: string;
-  /** Amount paid (smallest unit) */
-  amount: number;
-  /** Currency paid */
+/** Tempo charge request (method="tempo", intent="charge") */
+export interface TempoChargeRequest {
+  /** Stringified integer in base units (6 decimals) */
+  amount: string;
+  /** TIP-20 token contract address */
   currency: string;
-  /** Optional session id for session-based payments */
-  session_id?: string;
+  /** Recipient address on Tempo chain */
+  recipient: string;
+  description?: string;
+  externalId?: string;
+  methodDetails?: {
+    chainId?: number;
+    feePayer?: boolean;
+    memo?: string;
+  };
 }
 
-// ── Session types ──────────────────────────────────────
+// ── Credential payload (method-specific, included in Authorization header) ─
 
-export interface MppSession {
-  /** Unique session identifier */
-  session_id: string;
-  /** Maximum total spend in smallest currency unit */
-  budget: number;
-  /** ISO 4217 currency code */
-  currency: string;
-  /** Amount already spent in this session */
-  spent: number;
-  /** Session expiry (ISO 8601) */
-  expires_at: string;
+/** Lightning proof: 32-byte lowercase hex preimage */
+export interface LightningChargePayload {
+  preimage: string;
 }
 
-// ── Client configuration ───────────────────────────────
+// ── Credential (client → server in Authorization: Payment header) ───
 
-export interface MppSwapParams {
-  targetAddress: string;
-  targetToken: string;
-  targetChain: string;
-  targetAmount: number;
+export interface MppCredential {
+  /** Echo of all challenge params from the WWW-Authenticate header */
+  challenge: MppChallenge;
+  /** Optional payer DID identifier (did:pkh format) */
+  source?: string;
+  /** Method-specific payment proof */
+  payload: LightningChargePayload | Record<string, unknown>;
 }
 
-export interface MppSwapResult {
-  swapId: string;
-  status: string;
-}
+// ── Client configuration ────────────────────────────────────────────
 
 export interface MppClientConfig {
-  /** The swap skill for BTC→stablecoin conversions */
-  swap: {
-    swapBtcToStablecoin(params: MppSwapParams): Promise<MppSwapResult>;
+  /** Lightning skill for paying BOLT11 invoices */
+  lightning: {
+    payInvoice(params: { bolt11: string }): Promise<{ preimage: string }>;
   };
   /** Optional: custom fetch implementation (for testing) */
   fetch?: typeof globalThis.fetch;
 }
 
-// ── Result types ───────────────────────────────────────
+// ── Result types ────────────────────────────────────────────────────
 
 export interface MppPayResult {
   /** Whether the resource was successfully retrieved */
   ok: boolean;
   /** HTTP status code of the final response */
   status: number;
-  /** The response body (resource content) */
+  /** The response body */
   body: string;
   /** Response headers */
   headers: Record<string, string>;
-  /** The payment proof that was submitted (if payment was made) */
-  proof?: MppPaymentProof;
-  /** The swap id from claw-cash (if a BTC→stablecoin swap occurred) */
-  swap_id?: string;
-}
-
-export interface MppError {
-  code: string;
-  message: string;
+  /** The credential submitted (if payment was made) */
+  proof?: MppCredential;
+  /** Lightning payment preimage (if lightning method was used) */
+  paymentPreimage?: string;
 }

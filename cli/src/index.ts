@@ -1,4 +1,6 @@
 import minimist from "minimist";
+import type { ExtendedVirtualCoin, IncomingFunds } from "@arkade-os/sdk";
+import { VtxoManager } from "@arkade-os/sdk";
 import { loadConfig, validateConfig, getSessionStatus, saveConfig } from "./config.js";
 import { createContext } from "./context.js";
 import { outputError } from "./output.js";
@@ -18,7 +20,6 @@ import { handleConfig } from "./commands/config.js";
 import { handleSignPsbt } from "./commands/sign-psbt.js";
 import { handlePubkey } from "./commands/pubkey.js";
 import { handlePay } from "./commands/pay.js";
-import { handleDelegate } from "./commands/delegate.js";
 import { getVersion } from "./version.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
@@ -48,7 +49,6 @@ Usage:
     --method <GET|POST>           HTTP method (default: GET)
     --body <json>                 Request body (for POST/PUT/PATCH)
     --header 'Name: value'        Custom request headers (repeatable)
-  cash delegate                 Delegate settled VTXOs to the configured delegate service (auto-renewal)
   cash pubkey                   Show the wallet's public key (for multisig setup)
   cash sign-psbt <base64>       Sign a PSBT (Partially Signed Bitcoin Transaction)
                                 Parses PSBT, shows tx details, signs inputs
@@ -190,9 +190,6 @@ async function main() {
       case "pay":
         await handlePay(ctx, argv);
         break;
-      case "delegate":
-        await handleDelegate(ctx);
-        break;
       default:
         outputError(`Unknown command: ${command}. Run 'cash --help' for usage.`);
     }
@@ -315,6 +312,57 @@ async function runDaemon() {
   monitor.start();
   console.error("[daemon] lendaswap monitor started");
 
+  // Recover swept VTXOs on startup
+  const wallet = ctx.bitcoin.getWallet();
+  const vtxoManager = new VtxoManager(wallet);
+  void (async () => {
+    try {
+      const recoverable = await vtxoManager.getRecoverableBalance();
+      if (recoverable.recoverable > 0n) {
+        console.error(`[daemon] recovering ${recoverable.recoverable} sats in swept vtxo(s)...`);
+        await vtxoManager.recoverVtxos();
+        console.error("[daemon] vtxo recovery complete");
+      }
+    } catch (err) {
+      console.error(`[daemon] vtxo recovery error: ${err instanceof Error ? err.message : err}`);
+    }
+  })();
+
+  // Auto-delegate VTXOs when delegator is configured
+  let stopVtxoDelegate: (() => void) | undefined;
+  const delegatorManager = await wallet.getDelegatorManager();
+  if (delegatorManager) {
+    const delegateSettled = async () => {
+      try {
+        const vtxos = (await wallet.getVtxos({ withRecoverable: false })).filter(
+          (v: ExtendedVirtualCoin) => v.virtualStatus.state === "settled"
+        );
+        if (vtxos.length === 0) return;
+        const address = await wallet.getAddress();
+        const result = await delegatorManager.delegate(vtxos, address);
+        if (result.delegated.length > 0) {
+          console.error(`[daemon] delegated ${result.delegated.length} vtxo(s) for auto-renewal`);
+        }
+      } catch (err) {
+        console.error(`[daemon] vtxo delegation error: ${err instanceof Error ? err.message : err}`);
+      }
+    };
+
+    // Delegate any existing settled VTXOs on startup
+    void delegateSettled();
+
+    // Subscribe and delegate on every incoming VTXO
+    wallet.notifyIncomingFunds((funds: IncomingFunds) => {
+      if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
+        void delegateSettled();
+      }
+    }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {
+      console.error(`[daemon] vtxo delegate subscription error: ${err instanceof Error ? err.message : err}`);
+    });
+
+    console.error("[daemon] vtxo auto-delegation started");
+  }
+
   // Start HTTP server
   server.listen(port, "127.0.0.1", () => {
     saveDaemonPid(process.pid, port);
@@ -324,6 +372,7 @@ async function runDaemon() {
   // Graceful shutdown
   const shutdown = async () => {
     console.error("[daemon] shutting down...");
+    stopVtxoDelegate?.();
     monitor.stop();
     authMonitor.stop();
     await ctx.lightning.stopSwapManager();

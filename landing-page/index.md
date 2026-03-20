@@ -50,6 +50,20 @@ Accepts a bolt11 invoice directly as a positional argument.
 cash send --amount 10 --currency usdc --where polygon --to 0x...
 ```
 
+### Pay any MPP-enabled API
+
+```bash
+# GET — auto-detects 402, pays Lightning, retries with proof
+cash pay https://api.example.com/v1/generate
+
+# POST with body
+cash pay https://api.example.com/v1/chat --method POST --body '{"prompt":"hello"}'
+```
+
+`cash pay` implements the Machine Payments Protocol (IETF `draft-httpauth-payment-00`, co-authored by Stripe and Tempo). When the service returns `WWW-Authenticate: Payment method="lightning"`, Claw Cash pays the BOLT11 invoice from the agent's BTC treasury and retries with the Lightning preimage as cryptographic proof. No API key or billing account needed.
+
+Output: `{"ok":true,"data":{"status":200,"paid":true,"method":"lightning","preimage":"abcdef...","body":{...}}}`
+
 ## Command Reference
 
 | Command   | Description                          |
@@ -62,6 +76,7 @@ cash send --amount 10 --currency usdc --where polygon --to 0x...
 | `send`    | Send BTC or stablecoins              |
 | `receive` | Receive BTC or stablecoins           |
 | `balance` | Check balance                        |
+| `pay`     | Pay an MPP-enabled HTTP API          |
 | `swap`    | Check a specific swap status         |
 | `swaps`   | List all swaps                       |
 | `claim`   | Manually claim a swap                |
@@ -69,11 +84,25 @@ cash send --amount 10 --currency usdc --where polygon --to 0x...
 
 ## Currencies & Networks
 
-| Currency | Networks                        | Amount unit |
-|----------|---------------------------------|-------------|
-| `btc`    | `onchain`, `lightning`, `arkade`| satoshis    |
-| `usdt`   | `polygon`, `arbitrum`, `ethereum`| token units |
-| `usdc`   | `polygon`, `arbitrum`, `ethereum`| token units |
+| Currency | Networks                          | Amount unit |
+|----------|-----------------------------------|-------------|
+| `btc`    | `onchain`, `lightning`, `arkade`  | satoshis    |
+| `usdt`   | `polygon`, `arbitrum`, `ethereum` | token units |
+| `usdc`   | `polygon`, `arbitrum`, `ethereum` | token units |
+
+## Machine Payments Protocol (MPP)
+
+MPP is an open standard for machine-to-machine payments over HTTP. Services that implement it return `HTTP 402` with a `WWW-Authenticate: Payment` challenge instead of requiring an API key. The client pays and retries.
+
+### How `cash pay` works
+
+1. **Service returns 402** — `WWW-Authenticate: Payment method="lightning", request="<base64url>"` includes a BOLT11 invoice.
+2. **Agent pays from BTC treasury** — Claw Cash pays the Lightning invoice instantly. No stablecoin swap needed.
+3. **Retry with proof** — `Authorization: Payment <base64url({challenge, payload: {preimage}}))>` is sent. The preimage is cryptographic proof of payment.
+
+Supported MPP methods: `lightning`. Tempo chain support is on the roadmap.
+
+See [mpp.dev](https://mpp.dev) for a directory of MPP-enabled services.
 
 ## Identity & Security
 
@@ -115,6 +144,10 @@ Your agent offers a service and gets paid by humans in stablecoins. It converts 
 
 Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy compute — paying for the thinking they need, on demand.
 
+### Pay MPP APIs
+
+Call any MPP-enabled API with `cash pay <url>`. Auto-pays the Lightning challenge. No API keys, no billing accounts. See [mpp.dev](https://mpp.dev) for available services.
+
 ## Why Bitcoin for Agents?
 
 - **Fixed supply**: 21 million coins — a consensus rule, not a policy decision
@@ -127,10 +160,11 @@ Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy c
 ### NOW
 
 - **MCP Server** — Tool-use integration for Claude Code and Claude Desktop. Your agent calls wallet functions directly as MCP tools.
+- **MPP Client (`cash pay`)** — Machine Payments Protocol support. Auto-detects `WWW-Authenticate: Payment` challenges, pays via Lightning, retries with cryptographic proof.
 
 ### NEXT
 
-- **x402 Client Support** — `cash pay <url>` command. Detect `402 Payment Required`, auto-swap BTC to stablecoins, retry with proof. Blocked on x402 facilitators outside USDC on Base.
+- **MPP Tempo Chain** — Native settlement on the Tempo blockchain (chain ID 42431) for MPP services requiring TIP-20 token payments.
 - **Spending Policies** — Per-agent limits, allowlists, time-based rules. Control how much an agent can spend and where, enforced at the enclave level.
 - **More Auth Providers** — Slack, Google, 1Password, YubiKey, Passkeys. Same enclave identity, any auth method your agent environment supports.
 
@@ -143,8 +177,8 @@ Pay your own intelligence. Agents spend sats to call LLMs, run models, and buy c
 **Why Bitcoin instead of stablecoins?**
 Stablecoins depend on issuers, bank accounts, and regulatory decisions an agent can't verify. Bitcoin's 21 million supply cap is enforced by code. An agent can independently verify every block header, every transaction, every signature. For autonomous software, verifiable beats convenient.
 
-**Is x402 payment supported?**
-Not yet. x402 is on the roadmap but blocked on the lack of x402 facilitators outside USDC on Base (which LendaSwap doesn't support). Once facilitators expand to Polygon, Arbitrum, or Ethereum, Claw Cash will support `cash pay <url>` with automatic BTC→stablecoin swaps.
+**Does `cash pay` support MPP?**
+Yes — `cash pay <url>` is live. It implements the IETF Machine Payments Protocol (`draft-httpauth-payment-00`), co-authored by Stripe and Tempo. When a service returns `WWW-Authenticate: Payment method="lightning"`, Claw Cash pays the BOLT11 invoice from the agent's BTC treasury and retries with the preimage as cryptographic proof. No API key, no billing account. Supported method: `lightning`. Tempo chain support is next on the roadmap.
 
 **Where are the private keys stored?**
 Inside an AWS Nitro Enclave — a hardware-isolated VM with no persistent storage, no shell access. Keys are generated and sealed inside the enclave boundary and never leave it. The CLI communicates with the enclave over an attested TLS channel.

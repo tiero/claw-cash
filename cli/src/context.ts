@@ -13,6 +13,7 @@ import {
   SqliteWalletStorage,
   SqliteSwapStorage,
 } from "@lendasat/lendaswap-sdk-pure/node";
+import { SQLiteSwapRepository } from "@arkade-os/boltz-swap/repositories/sqlite";
 import {
   ArkadeBitcoinSkill,
   ArkadeLightningSkill,
@@ -72,6 +73,7 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
     wallet,
     network: config.network as NetworkName,
     enableSwapManager: opts?.enableSwapManager,
+    swapRepository: new SQLiteSwapRepository(executor),
   });
 
   // Persistent SQLite storage for LendaSwap

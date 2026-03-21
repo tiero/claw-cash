@@ -304,18 +304,32 @@ async function runDaemon() {
   const authMonitor = new AuthMonitor();
   const server = createDaemonServer({ port, ctx, monitor, authMonitor, webhookRegistry });
 
-  // Start Lightning SwapManager
-  await ctx.lightning.startSwapManager();
-  console.error("[daemon] lightning swap manager started");
+  // Start HTTP server first — so the parent's /health poll succeeds immediately
+  // (startSwapManager and getDelegatorManager are awaited below in the background)
+  server.listen(port, "127.0.0.1", () => {
+    saveDaemonPid(process.pid, port);
+    console.error(`[daemon] listening on http://127.0.0.1:${port}`);
+  });
 
   // Start LendaSwap poller
   monitor.start();
   console.error("[daemon] lendaswap monitor started");
 
-  // Recover swept VTXOs on startup
-  const wallet = ctx.bitcoin.getWallet();
-  const vtxoManager = new VtxoManager(wallet);
+  let stopVtxoDelegate: (() => void) | undefined;
+
+  // Background init: Lightning swap manager + VTXO recovery + auto-delegation
   void (async () => {
+    // Start Lightning SwapManager
+    try {
+      await ctx.lightning.startSwapManager();
+      console.error("[daemon] lightning swap manager started");
+    } catch (err) {
+      console.error(`[daemon] lightning swap manager error: ${err instanceof Error ? err.message : err}`);
+    }
+
+    // Recover swept VTXOs on startup
+    const wallet = ctx.bitcoin.getWallet();
+    const vtxoManager = new VtxoManager(wallet);
     try {
       const recoverable = await vtxoManager.getRecoverableBalance();
       if (recoverable.recoverable > 0n) {
@@ -326,48 +340,45 @@ async function runDaemon() {
     } catch (err) {
       console.error(`[daemon] vtxo recovery error: ${err instanceof Error ? err.message : err}`);
     }
-  })();
 
-  // Auto-delegate VTXOs when delegator is configured
-  let stopVtxoDelegate: (() => void) | undefined;
-  const delegatorManager = await wallet.getDelegatorManager();
-  if (delegatorManager) {
-    const delegateSettled = async () => {
-      try {
-        const vtxos = (await wallet.getVtxos({ withRecoverable: false })).filter(
-          (v: ExtendedVirtualCoin) => v.virtualStatus.state === "settled"
-        );
-        if (vtxos.length === 0) return;
-        const address = await wallet.getAddress();
-        const result = await delegatorManager.delegate(vtxos, address);
-        if (result.delegated.length > 0) {
-          console.error(`[daemon] delegated ${result.delegated.length} vtxo(s) for auto-renewal`);
-        }
-      } catch (err) {
-        console.error(`[daemon] vtxo delegation error: ${err instanceof Error ? err.message : err}`);
-      }
-    };
+    // Auto-delegate VTXOs when delegator is configured
+    try {
+      const delegatorManager = await wallet.getDelegatorManager();
+      if (delegatorManager) {
+        const delegateSettled = async () => {
+          try {
+            const vtxos = (await wallet.getVtxos({ withRecoverable: false })).filter(
+              (v: ExtendedVirtualCoin) => v.virtualStatus.state === "settled"
+            );
+            if (vtxos.length === 0) return;
+            const address = await wallet.getAddress();
+            const result = await delegatorManager.delegate(vtxos, address);
+            if (result.delegated.length > 0) {
+              console.error(`[daemon] delegated ${result.delegated.length} vtxo(s) for auto-renewal`);
+            }
+          } catch (err) {
+            console.error(`[daemon] vtxo delegation error: ${err instanceof Error ? err.message : err}`);
+          }
+        };
 
-    // Delegate any existing settled VTXOs on startup
-    void delegateSettled();
-
-    // Subscribe and delegate on every incoming VTXO
-    wallet.notifyIncomingFunds((funds: IncomingFunds) => {
-      if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
+        // Delegate any existing settled VTXOs on startup
         void delegateSettled();
+
+        // Subscribe and delegate on every incoming VTXO
+        wallet.notifyIncomingFunds((funds: IncomingFunds) => {
+          if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
+            void delegateSettled();
+          }
+        }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {
+          console.error(`[daemon] vtxo delegate subscription error: ${err instanceof Error ? err.message : err}`);
+        });
+
+        console.error("[daemon] vtxo auto-delegation started");
       }
-    }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {
-      console.error(`[daemon] vtxo delegate subscription error: ${err instanceof Error ? err.message : err}`);
-    });
-
-    console.error("[daemon] vtxo auto-delegation started");
-  }
-
-  // Start HTTP server
-  server.listen(port, "127.0.0.1", () => {
-    saveDaemonPid(process.pid, port);
-    console.error(`[daemon] listening on http://127.0.0.1:${port}`);
-  });
+    } catch (err) {
+      console.error(`[daemon] delegator init error: ${err instanceof Error ? err.message : err}`);
+    }
+  })();
 
   // Graceful shutdown
   const shutdown = async () => {

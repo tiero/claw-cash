@@ -1,7 +1,8 @@
 import {
-  ArkadeLightning,
+  ArkadeSwaps,
   BoltzSwapProvider,
   decodeInvoice,
+  type SwapRepository,
   type PendingReverseSwap,
   type PendingSubmarineSwap,
 } from "@arkade-os/boltz-swap";
@@ -36,6 +37,7 @@ export interface ArkadeLightningSkillConfig {
   boltzApiUrl?: string;
   referralId?: string;
   enableSwapManager?: boolean;
+  swapRepository?: SwapRepository;
 }
 
 export class ArkadeLightningSkill implements LightningSkill {
@@ -44,7 +46,7 @@ export class ArkadeLightningSkill implements LightningSkill {
     "Lightning Network payments via Boltz submarine swaps for Arkade wallets";
   readonly version = "1.0.0";
 
-  private readonly arkadeLightning: ArkadeLightning;
+  private readonly arkadeSwaps: ArkadeSwaps;
   private readonly swapProvider: BoltzSwapProvider;
   private readonly network: NetworkName;
   private readonly swapErrors = new Map<string, string>();
@@ -63,20 +65,21 @@ export class ArkadeLightningSkill implements LightningSkill {
       referralId: config.referralId,
     });
 
-    this.arkadeLightning = new ArkadeLightning({
+    this.arkadeSwaps = new ArkadeSwaps({
       wallet: config.wallet as ConstructorParameters<
-        typeof ArkadeLightning
+        typeof ArkadeSwaps
       >[0]["wallet"],
       swapProvider: this.swapProvider,
       arkProvider: config.arkProvider,
       indexerProvider: config.indexerProvider,
+      swapRepository: config.swapRepository,
       swapManager: config.enableSwapManager
-        ? { enableAutoActions: true, autoStart: true }
-        : undefined,
+        ? { autoStart: true }
+        : false,
     });
 
     // Track swap errors from SwapManager for debugging
-    const manager = this.arkadeLightning.getSwapManager?.();
+    const manager = this.arkadeSwaps.getSwapManager?.();
     if (manager) {
       manager.onSwapFailed?.((swap: { id: string }, error: unknown) => {
         const msg = error instanceof Error ? error.message : String(error);
@@ -96,7 +99,7 @@ export class ArkadeLightningSkill implements LightningSkill {
   }
 
   async createInvoice(params: CreateInvoiceParams): Promise<LightningInvoice> {
-    const response = await this.arkadeLightning.createLightningInvoice({
+    const response = await this.arkadeSwaps.createLightningInvoice({
       amount: params.amount,
       description: params.description,
     });
@@ -115,7 +118,7 @@ export class ArkadeLightningSkill implements LightningSkill {
   }
 
   async payInvoice(params: PayInvoiceParams): Promise<PaymentResult> {
-    const response = await this.arkadeLightning.sendLightningPayment({
+    const response = await this.arkadeSwaps.sendLightningPayment({
       invoice: params.bolt11,
     });
 
@@ -127,17 +130,17 @@ export class ArkadeLightningSkill implements LightningSkill {
   }
 
   async getFees(): Promise<LightningFees> {
-    return this.arkadeLightning.getFees();
+    return this.arkadeSwaps.getFees();
   }
 
   async getLimits(): Promise<LightningLimits> {
-    return this.arkadeLightning.getLimits();
+    return this.arkadeSwaps.getLimits();
   }
 
   async getPendingSwaps(): Promise<SwapInfo[]> {
     // Refresh statuses from Boltz API before returning
     try {
-      await this.arkadeLightning.refreshSwapsStatus();
+      await this.arkadeSwaps.refreshSwapsStatus();
     } catch {
       // Non-fatal: return stale data if refresh fails
     }
@@ -147,7 +150,7 @@ export class ArkadeLightningSkill implements LightningSkill {
   }
 
   async getSwapHistory(): Promise<SwapInfo[]> {
-    const history = await this.arkadeLightning.getSwapHistory();
+    const history = await this.arkadeSwaps.getSwapHistory();
     return history.map((swap) =>
       swap.type === "reverse"
         ? this.mapReverseSwap(swap as PendingReverseSwap)
@@ -158,11 +161,11 @@ export class ArkadeLightningSkill implements LightningSkill {
   async waitAndClaim(
     pendingSwap: PendingReverseSwap
   ): Promise<{ txid: string }> {
-    return this.arkadeLightning.waitAndClaim(pendingSwap);
+    return this.arkadeSwaps.waitAndClaim(pendingSwap);
   }
 
-  getArkadeLightning(): ArkadeLightning {
-    return this.arkadeLightning;
+  getArkadeSwaps(): ArkadeSwaps {
+    return this.arkadeSwaps;
   }
 
   getSwapProvider(): BoltzSwapProvider {
@@ -170,15 +173,15 @@ export class ArkadeLightningSkill implements LightningSkill {
   }
 
   async startSwapManager(): Promise<void> {
-    await this.arkadeLightning.startSwapManager();
+    await this.arkadeSwaps.startSwapManager();
   }
 
   async stopSwapManager(): Promise<void> {
-    await this.arkadeLightning.stopSwapManager();
+    await this.arkadeSwaps.stopSwapManager();
   }
 
   async dispose(): Promise<void> {
-    await this.arkadeLightning.dispose();
+    await this.arkadeSwaps.dispose();
   }
 
   private mapReverseSwap(swap: PendingReverseSwap): SwapInfo {

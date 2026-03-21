@@ -10,9 +10,9 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@clw-cash/sdk": "workspace:*",
+    "@arkade-os/boltz-swap": "^0.3.8",
     "@arkade-os/sdk": "^0.4.10",
-    "@arkade-os/boltz-swap": "^0.2.18",
+    "@clw-cash/sdk": "workspace:*",
     "@lendasat/lendaswap-sdk-pure": "^0.0.2"
   },
   "devDependencies": {

@@ -60,12 +60,13 @@ export async function startDaemonInBackground(port: number): Promise<{ pid: numb
 
   const logFd = openSync(LOG_FILE, "a");
 
-  // Use the same node binary and entrypoint that's currently running
-  // This works both in dev (tsx cli/src/index.ts) and production (node dist/index.js)
+  // Reproduce the exact node invocation that's currently running.
+  // process.execArgv carries tsx loader flags in dev (e.g. --import tsx/esm)
+  // and is empty in production (node dist/index.js).
   const nodeBin = process.execPath;
   const entrypoint = process.argv[1];
 
-  const child = spawn(nodeBin, [entrypoint, "--daemon-internal", "--port", String(port)], {
+  const child = spawn(nodeBin, [...process.execArgv, entrypoint, "--daemon-internal", "--port", String(port)], {
     cwd: process.cwd(),
     env: { ...process.env },
     detached: true,

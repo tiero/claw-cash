@@ -212,6 +212,26 @@ app.post("/telegram-webhook", async (c) => {
   return c.json({ ok: true });
 });
 
+// ── Notifications ─────────────────────────────────────────────
+
+app.post("/v1/notify/telegram", requireAuth, async (c) => {
+  const auth = c.get("auth");
+  if (!auth.telegram_user_id) {
+    throw new HTTPException(400, { message: "No Telegram user associated with this session" });
+  }
+  if (!(c.env.TELEGRAM_BOT_TOKEN ?? "").length) {
+    throw new HTTPException(503, { message: "Telegram bot not configured" });
+  }
+
+  const body = (await c.req.json()) as { message?: string };
+  if (!body.message || typeof body.message !== "string") {
+    throw new HTTPException(400, { message: "Missing message" });
+  }
+
+  await sendTelegramMessage(c.env.TELEGRAM_BOT_TOKEN, Number(auth.telegram_user_id), body.message);
+  return c.json({ ok: true });
+});
+
 // ── Identities ────────────────────────────────────────────────
 
 app.get("/v1/identities", requireAuth, async (c) => {

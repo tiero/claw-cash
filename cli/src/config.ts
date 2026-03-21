@@ -10,8 +10,6 @@ export interface CashConfig {
   arkServerUrl: string;
   network: string;
   delegatorUrl?: string;
-  telegramBotToken?: string;
-  telegramChatId?: number;
 }
 
 const CONFIG_DIR = join(homedir(), ".clw-cash");
@@ -62,14 +60,6 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
       overrides?.delegatorUrl ??
       process.env.CLW_DELEGATOR_URL ??
       fileConfig.delegatorUrl,
-    telegramBotToken:
-      overrides?.telegramBotToken ??
-      process.env.CLW_TELEGRAM_BOT_TOKEN ??
-      fileConfig.telegramBotToken,
-    telegramChatId:
-      overrides?.telegramChatId ??
-      (process.env.CLW_TELEGRAM_CHAT_ID ? Number(process.env.CLW_TELEGRAM_CHAT_ID) : undefined) ??
-      fileConfig.telegramChatId,
   };
 
   return config;
@@ -92,8 +82,6 @@ const ENV_KEYS: Record<keyof Required<CashConfig>, string> = {
   arkServerUrl: "CLW_ARK_SERVER_URL",
   network: "CLW_NETWORK",
   delegatorUrl: "CLW_DELEGATOR_URL",
-  telegramBotToken: "CLW_TELEGRAM_BOT_TOKEN",
-  telegramChatId: "CLW_TELEGRAM_CHAT_ID",
 };
 
 const DEFAULTS: Record<keyof Required<CashConfig>, string> = {
@@ -104,8 +92,6 @@ const DEFAULTS: Record<keyof Required<CashConfig>, string> = {
   arkServerUrl: "https://arkade.computer",
   network: "bitcoin",
   delegatorUrl: "",
-  telegramBotToken: "",
-  telegramChatId: "",
 };
 
 export function loadConfigWithSources(): CashConfigWithSources {

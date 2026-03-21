@@ -26,7 +26,6 @@ import { handleConfig } from "./commands/config.js";
 import { handleSignPsbt } from "./commands/sign-psbt.js";
 import { handlePubkey } from "./commands/pubkey.js";
 import { handlePay } from "./commands/pay.js";
-import { handleNotify } from "./commands/notify.js";
 import { getVersion } from "./version.js";
 
 const HELP = `cash - Bitcoin & Stablecoin CLI
@@ -139,9 +138,6 @@ async function main() {
         return;
       case "pubkey":
         await handlePubkey();
-        return;
-      case "notify":
-        await handleNotify(argv);
         return;
       case "start":
         await handleStart();
@@ -374,22 +370,25 @@ async function runDaemon() {
         // Delegate any existing settled VTXOs on startup
         void delegateSettled();
 
-        const { sendTelegramMessage } = await import("./commands/notify.js");
-
         // Subscribe and delegate on every incoming VTXO
         wallet.notifyIncomingFunds((funds: IncomingFunds) => {
           if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
             void delegateSettled();
 
-            // Telegram notification (fire-and-forget)
+            // Telegram notification via server (fire-and-forget)
             const freshConfig = loadConfig();
-            if (freshConfig.telegramBotToken && freshConfig.telegramChatId) {
+            if (freshConfig.sessionToken) {
               const totalSats = funds.newVtxos.reduce((sum: bigint, v: ExtendedVirtualCoin) => sum + v.amount, 0n);
-              void sendTelegramMessage(
-                freshConfig.telegramBotToken,
-                freshConfig.telegramChatId,
-                `⚡ Received ${totalSats.toLocaleString()} sats`
-              );
+              void fetch(`${freshConfig.apiBaseUrl}/v1/notify/telegram`, {
+                method: "POST",
+                headers: {
+                  "content-type": "application/json",
+                  authorization: `Bearer ${freshConfig.sessionToken}`,
+                },
+                body: JSON.stringify({ message: `⚡ Received ${totalSats.toLocaleString()} sats` }),
+              }).catch((err: unknown) => {
+                console.error(`[daemon] telegram notify error: ${err instanceof Error ? err.message : err}`);
+              });
             }
           }
         }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {

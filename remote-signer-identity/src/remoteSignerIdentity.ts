@@ -1,20 +1,37 @@
 import { hexDecode, hexEncode } from "./hex.js";
-import { Transaction } from "@arkade-os/sdk";
-import type { Identity, SignerSession } from "@arkade-os/sdk";
+import { Transaction, TxTree } from "@arkade-os/sdk";
+import type {
+  Identity,
+  SignerSession,
+  TreeNonces,
+  TreePartialSigs,
+} from "@arkade-os/sdk";
 import { ClwApiClient } from "./apiClient.js";
 import { ReadonlyRemoteIdentity } from "./readonlyRemoteIdentity.js";
 import { extractDigests, injectSignatures } from "./signingUtils.js";
 import type { RemoteSignerConfig } from "./types.js";
 
-// Dynamic import to avoid hard dependency on internal SDK module
-let _TreeSignerSession: { random(): SignerSession } | null = null;
-async function getTreeSignerSession(): Promise<{ random(): SignerSession }> {
-  if (!_TreeSignerSession) {
-    const mod = await import("@arkade-os/sdk");
-    // TreeSignerSession is a named export from the SDK
-    _TreeSignerSession = (mod as Record<string, unknown>).TreeSignerSession as { random(): SignerSession };
+/**
+ * RemoteSignerSession is a stub SignerSession for RemoteSignerIdentity.
+ * MuSig2 collaborative tree signing (used during Ark settlement) requires
+ * the private key and is not currently supported via the remote API.
+ */
+class RemoteSignerSession implements SignerSession {
+  getPublicKey(): Promise<Uint8Array> {
+    throw new Error("MuSig2 tree signing is not supported by RemoteSignerIdentity");
   }
-  return _TreeSignerSession;
+  init(_tree: TxTree, _scriptRoot: Uint8Array, _rootInputAmount: bigint): Promise<void> {
+    throw new Error("MuSig2 tree signing is not supported by RemoteSignerIdentity");
+  }
+  getNonces(): Promise<TreeNonces> {
+    throw new Error("MuSig2 tree signing is not supported by RemoteSignerIdentity");
+  }
+  aggregatedNonces(_txid: string, _noncesByPubkey: TreeNonces): Promise<{ hasAllNonces: boolean }> {
+    throw new Error("MuSig2 tree signing is not supported by RemoteSignerIdentity");
+  }
+  sign(): Promise<TreePartialSigs> {
+    throw new Error("MuSig2 tree signing is not supported by RemoteSignerIdentity");
+  }
 }
 
 /**
@@ -71,29 +88,7 @@ export class RemoteSignerIdentity implements Identity {
   // ── Identity ──────────────────────────────────────────────
 
   signerSession(): SignerSession {
-    // Use dynamic import result; if not yet loaded, do a sync fallback
-    if (!_TreeSignerSession) {
-      // Trigger async load for future calls
-      void getTreeSignerSession();
-      // For now, return a minimal session that will be initialized before use
-      throw new Error("TreeSignerSession not yet loaded. Call await RemoteSignerIdentity.init() first or use signerSessionAsync().");
-    }
-    return _TreeSignerSession.random();
-  }
-
-  /**
-   * Async version of signerSession() that ensures the module is loaded.
-   */
-  async signerSessionAsync(): Promise<SignerSession> {
-    const TSS = await getTreeSignerSession();
-    return TSS.random();
-  }
-
-  /**
-   * Pre-load async dependencies. Call this once after construction if you need signerSession().
-   */
-  static async init(): Promise<void> {
-    await getTreeSignerSession();
+    return new RemoteSignerSession();
   }
 
   /**

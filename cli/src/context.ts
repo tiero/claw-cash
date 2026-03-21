@@ -50,9 +50,9 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
   const db = new Database(ARK_DB);
   db.pragma("journal_mode = WAL");
   const executor: SQLExecutor = {
-    run: async (sql, params) => { db.prepare(sql).run(...(params ?? [])); },
-    get: async (sql, params) => db.prepare(sql).get(...(params ?? [])) as any,
-    all: async (sql, params) => db.prepare(sql).all(...(params ?? [])) as any,
+    run: async (sql: string, params?: unknown[]) => { db.prepare(sql).run(...(params ?? [])); },
+    get: async (sql: string, params?: unknown[]) => db.prepare(sql).get(...(params ?? [])) as any,
+    all: async (sql: string, params?: unknown[]) => db.prepare(sql).all(...(params ?? [])) as any,
   };
 
   const wallet = await Wallet.create({

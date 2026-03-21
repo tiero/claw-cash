@@ -92,6 +92,8 @@ const ENV_KEYS: Record<keyof Required<CashConfig>, string> = {
   arkServerUrl: "CLW_ARK_SERVER_URL",
   network: "CLW_NETWORK",
   delegatorUrl: "CLW_DELEGATOR_URL",
+  telegramBotToken: "CLW_TELEGRAM_BOT_TOKEN",
+  telegramChatId: "CLW_TELEGRAM_CHAT_ID",
 };
 
 const DEFAULTS: Record<keyof Required<CashConfig>, string> = {
@@ -102,6 +104,8 @@ const DEFAULTS: Record<keyof Required<CashConfig>, string> = {
   arkServerUrl: "https://arkade.computer",
   network: "bitcoin",
   delegatorUrl: "",
+  telegramBotToken: "",
+  telegramChatId: "",
 };
 
 export function loadConfigWithSources(): CashConfigWithSources {
@@ -119,8 +123,8 @@ export function loadConfigWithSources(): CashConfigWithSources {
     const envVal = process.env[ENV_KEYS[key]];
     if (envVal !== undefined) {
       result[key] = { value: envVal, source: "env" };
-    } else if (fileConfig[key]) {
-      result[key] = { value: fileConfig[key], source: "file" };
+    } else if (fileConfig[key] !== undefined) {
+      result[key] = { value: String(fileConfig[key]), source: "file" };
     } else {
       result[key] = { value: DEFAULTS[key], source: "default" };
     }

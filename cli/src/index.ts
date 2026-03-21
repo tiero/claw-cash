@@ -1,3 +1,9 @@
+// Polyfill EventSource for Node.js (used by @arkade-os/sdk ContractWatcher via SSE)
+import { EventSource } from "eventsource";
+if (typeof globalThis.EventSource === "undefined") {
+  (globalThis as unknown as Record<string, unknown>).EventSource = EventSource;
+}
+
 import minimist from "minimist";
 import type { ExtendedVirtualCoin, IncomingFunds } from "@arkade-os/sdk";
 import { VtxoManager } from "@arkade-os/sdk";

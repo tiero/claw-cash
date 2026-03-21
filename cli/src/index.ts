@@ -384,7 +384,7 @@ async function runDaemon() {
         // Telegram notification via server (fire-and-forget)
         const freshConfig = loadConfig();
         if (freshConfig.sessionToken) {
-          const totalSats = funds.newVtxos.reduce((sum: number, v: ExtendedVirtualCoin) => sum + Number(v.amount), 0);
+          const totalSats = funds.newVtxos.reduce((sum: number, v: ExtendedVirtualCoin) => sum + v.value, 0);
           void fetch(`${freshConfig.apiBaseUrl}/v1/notify/telegram`, {
             method: "POST",
             headers: {

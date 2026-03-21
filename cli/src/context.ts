@@ -1,9 +1,14 @@
 import { join } from "node:path";
 import { homedir } from "node:os";
 import { mkdirSync } from "node:fs";
+import Database from "better-sqlite3";
 import { RemoteSignerIdentity } from "@clw-cash/sdk";
 import { Wallet, RestDelegatorProvider } from "@arkade-os/sdk";
-import { FileSystemStorageAdapter } from "@arkade-os/sdk/adapters/fileSystem";
+import {
+  SQLiteWalletRepository,
+  SQLiteContractRepository,
+  type SQLExecutor,
+} from "@arkade-os/sdk/repositories/sqlite";
 import {
   SqliteWalletStorage,
   SqliteSwapStorage,
@@ -38,14 +43,24 @@ export async function createContext(config: CashConfig, opts?: CreateContextOpts
     compressedPublicKey: config.publicKey,
   });
 
-  // Persistent filesystem storage for Wallet + Boltz swap (contractRepository)
   mkdirSync(DATA_DIR, { recursive: true, mode: 0o700 });
-  const walletStorage = new FileSystemStorageAdapter(DATA_DIR);
+
+  const ARK_DB = join(homedir(), ".clw-cash", "ark-wallet.db");
+  const db = new Database(ARK_DB);
+  db.pragma("journal_mode = WAL");
+  const executor: SQLExecutor = {
+    run: async (sql, params) => { db.prepare(sql).run(...(params ?? [])); },
+    get: async (sql, params) => db.prepare(sql).get(...(params ?? [])) as any,
+    all: async (sql, params) => db.prepare(sql).all(...(params ?? [])) as any,
+  };
 
   const wallet = await Wallet.create({
     identity,
     arkServerUrl: config.arkServerUrl,
-    storage: walletStorage,
+    storage: {
+      walletRepository: new SQLiteWalletRepository(executor),
+      contractRepository: new SQLiteContractRepository(executor),
+    },
     ...(config.delegatorUrl
       ? { delegatorProvider: new RestDelegatorProvider(config.delegatorUrl) }
       : {}),

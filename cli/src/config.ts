@@ -10,6 +10,8 @@ export interface CashConfig {
   arkServerUrl: string;
   network: string;
   delegatorUrl?: string;
+  telegramBotToken?: string;
+  telegramChatId?: number;
 }
 
 const CONFIG_DIR = join(homedir(), ".clw-cash");
@@ -60,6 +62,14 @@ export function loadConfig(overrides?: Partial<CashConfig>): CashConfig {
       overrides?.delegatorUrl ??
       process.env.CLW_DELEGATOR_URL ??
       fileConfig.delegatorUrl,
+    telegramBotToken:
+      overrides?.telegramBotToken ??
+      process.env.CLW_TELEGRAM_BOT_TOKEN ??
+      fileConfig.telegramBotToken,
+    telegramChatId:
+      overrides?.telegramChatId ??
+      (process.env.CLW_TELEGRAM_CHAT_ID ? Number(process.env.CLW_TELEGRAM_CHAT_ID) : undefined) ??
+      fileConfig.telegramChatId,
   };
 
   return config;

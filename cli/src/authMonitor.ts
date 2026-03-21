@@ -73,9 +73,11 @@ export class AuthMonitor {
           user: { id: string; telegram_user_id: string; status: string };
         };
 
-        // Save the new token to config
+        // Save the new token + telegram context to config
         const config = loadConfig();
         config.sessionToken = session.token;
+        config.telegramBotToken = auth.botToken;
+        config.telegramChatId = auth.chatId;
         saveConfig(config);
 
         // Restore or recover identity

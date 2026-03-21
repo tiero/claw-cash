@@ -233,13 +233,33 @@ deploy_landing() {
 deploy_cli() {
   info "Publishing CLI to npm..."
 
+  local pkg_json="$ROOT_DIR/cli/package.json"
+  local local_version
+  local_version=$(node -p "require('$pkg_json').version")
+
+  local published_version
+  published_version=$(npm view clw-cash version 2>/dev/null || echo "0.0.0")
+
+  info "Local version:     $local_version"
+  info "Published version: $published_version"
+
+  if [[ "$local_version" == "$published_version" ]]; then
+    # Auto-bump patch
+    local major minor patch
+    IFS='.' read -r major minor patch <<< "$local_version"
+    patch=$((patch + 1))
+    local new_version="$major.$minor.$patch"
+    warn "Version $local_version already published — bumping to $new_version"
+    (cd "$ROOT_DIR/cli" && npm version "$new_version" --no-git-tag-version)
+  fi
+
   info "Building CLI..."
   pnpm --filter clw-cash build
 
   info "Publishing..."
   (cd "$ROOT_DIR/cli" && npm publish)
 
-  info "CLI publish complete!"
+  info "CLI publish complete! ($(node -p "require('$pkg_json').version"))"
 }
 
 # ── Orchestration ─────────────────────────────────────────────────────

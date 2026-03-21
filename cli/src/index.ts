@@ -348,10 +348,11 @@ async function runDaemon() {
     }
 
     // Auto-delegate VTXOs when delegator is configured
+    let delegateSettled: (() => Promise<void>) | undefined;
     try {
       const delegatorManager = await wallet.getDelegatorManager();
       if (delegatorManager) {
-        const delegateSettled = async () => {
+        delegateSettled = async () => {
           try {
             const vtxos = (await wallet.getVtxos({ withRecoverable: false })).filter(
               (v: ExtendedVirtualCoin) => v.virtualStatus.state === "settled"
@@ -369,37 +370,36 @@ async function runDaemon() {
 
         // Delegate any existing settled VTXOs on startup
         void delegateSettled();
-
-        // Subscribe and delegate on every incoming VTXO
-        wallet.notifyIncomingFunds((funds: IncomingFunds) => {
-          if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
-            void delegateSettled();
-
-            // Telegram notification via server (fire-and-forget)
-            const freshConfig = loadConfig();
-            if (freshConfig.sessionToken) {
-              const totalSats = funds.newVtxos.reduce((sum: bigint, v: ExtendedVirtualCoin) => sum + v.amount, 0n);
-              void fetch(`${freshConfig.apiBaseUrl}/v1/notify/telegram`, {
-                method: "POST",
-                headers: {
-                  "content-type": "application/json",
-                  authorization: `Bearer ${freshConfig.sessionToken}`,
-                },
-                body: JSON.stringify({ message: `⚡ Received ${totalSats.toLocaleString()} sats` }),
-              }).catch((err: unknown) => {
-                console.error(`[daemon] telegram notify error: ${err instanceof Error ? err.message : err}`);
-              });
-            }
-          }
-        }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {
-          console.error(`[daemon] vtxo delegate subscription error: ${err instanceof Error ? err.message : err}`);
-        });
-
         console.error("[daemon] vtxo auto-delegation started");
       }
     } catch (err) {
       console.error(`[daemon] delegator init error: ${err instanceof Error ? err.message : err}`);
     }
+
+    // Subscribe to incoming VTXOs (always — for Telegram notifications + optional delegation)
+    wallet.notifyIncomingFunds((funds: IncomingFunds) => {
+      if (funds.type === "vtxo" && funds.newVtxos.length > 0) {
+        if (delegateSettled) void delegateSettled();
+
+        // Telegram notification via server (fire-and-forget)
+        const freshConfig = loadConfig();
+        if (freshConfig.sessionToken) {
+          const totalSats = funds.newVtxos.reduce((sum: bigint, v: ExtendedVirtualCoin) => sum + v.amount, 0n);
+          void fetch(`${freshConfig.apiBaseUrl}/v1/notify/telegram`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              authorization: `Bearer ${freshConfig.sessionToken}`,
+            },
+            body: JSON.stringify({ message: `⚡ Received ${totalSats.toLocaleString()} sats` }),
+          }).catch((err: unknown) => {
+            console.error(`[daemon] telegram notify error: ${err instanceof Error ? err.message : err}`);
+          });
+        }
+      }
+    }).then((stop: () => void) => { stopVtxoDelegate = stop; }).catch((err: unknown) => {
+      console.error(`[daemon] vtxo subscription error: ${err instanceof Error ? err.message : err}`);
+    });
   })();
 
   // Graceful shutdown

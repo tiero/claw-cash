@@ -1,8 +1,8 @@
-import { createPublicClient, http, erc20Abi, parseUnits } from "viem";
+import { createPublicClient, http } from "viem";
 import { mainnet } from "viem/chains";
-import { parseParams, CURRENCY_CHAIN_TO_TOKEN, TOKEN_DECIMALS } from "./params.js";
+import { parseParams, CURRENCY_CHAIN_TO_TOKEN } from "./params.js";
 import { connectWallet } from "./wallet.js";
-import { createSwap, getFundingCallData, pollSwapStatus } from "./swap.js";
+import { createSwap, fundSwapWithWallet, pollSwapStatus } from "./swap.js";
 import { renderPage, setStep, setStatus, setEnsName, setSender, selectChain, showError, updateDebug } from "./ui.js";
 import "./style.css";
 
@@ -70,71 +70,28 @@ async function main() {
         setSender(address);
         updateDebug({ sender: address, chain: selectedChain, token: selectedToken });
 
-        let approveTo: string;
-        let approveData: string;
-        let fundTo: string;
-        let fundData: string;
         let swapId: string | undefined;
 
-        if (params.funding) {
-          // Pre-created by CLI — funding call data from API or URL
-          approveTo = params.funding.approveTo;
-          approveData = params.funding.approveData;
-          fundTo = params.funding.fundTo;
-          fundData = params.funding.fundData;
+        if (params.swapId) {
+          // Pre-created by CLI — fund the existing swap via SDK
           swapId = params.swapId;
+          setStep("fund");
+          const txHash = await fundSwapWithWallet(swapId, walletClient, publicClient, address);
+          updateDebug({ swapId, fundTx: txHash });
         } else {
-          // Web creates the swap (chain selected by sender or from URL)
+          // Web creates the swap — use SDK's fundSwap (handles Permit2 flow)
           setStep("creating-swap");
           const swapParams = { ...params, chain: selectedChain, token: selectedToken };
           const swapResult = await createSwap(swapParams, address);
           swapId = swapResult.response.id;
           updateDebug({ swapId });
 
-          setStep("preparing-tx");
-          const callData = await getFundingCallData(swapId, selectedToken);
-          approveTo = callData.approve.to;
-          approveData = callData.approve.data;
-          fundTo = callData.createSwap.to;
-          fundData = callData.createSwap.data;
+          setStep("fund");
+          const txHash = await fundSwapWithWallet(swapId, walletClient, publicClient, address);
+          updateDebug({ fundTx: txHash });
         }
 
-        // 2. Approve token spend (skip if allowance already sufficient)
-        const requiredAmount = parseUnits(String(params.amount), TOKEN_DECIMALS[selectedToken] ?? 6);
-        const currentAllowance = await publicClient.readContract({
-          address: approveTo as `0x${string}`,
-          abi: erc20Abi,
-          functionName: "allowance",
-          args: [address, fundTo as `0x${string}`],
-        });
-        updateDebug({ currentAllowance: currentAllowance.toString(), requiredAmount: requiredAmount.toString() });
-
-        if (currentAllowance < requiredAmount) {
-          setStep("approve");
-          const approveTxHash = await walletClient.sendTransaction({
-            to: approveTo as `0x${string}`,
-            data: approveData as `0x${string}`,
-            account: address,
-            chain: walletClient.chain,
-          });
-          await publicClient.waitForTransactionReceipt({ hash: approveTxHash });
-          updateDebug({ approveTx: approveTxHash });
-        } else {
-          updateDebug({ approveSkipped: true });
-        }
-
-        // 3. Fund the swap
-        setStep("fund");
-        const fundTxHash = await walletClient.sendTransaction({
-          to: fundTo as `0x${string}`,
-          data: fundData as `0x${string}`,
-          account: address,
-          chain: walletClient.chain,
-        });
-        await publicClient.waitForTransactionReceipt({ hash: fundTxHash });
-        updateDebug({ fundTx: fundTxHash });
-
-        // 4. Done — poll LendaSwap for completion
+        // Done — poll LendaSwap for completion
         if (params.funding) {
           // Pre-created swap: CLI daemon claims automatically
           setStep("done");

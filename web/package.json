@@ -10,7 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@lendasat/lendaswap-sdk-pure": "^0.0.2",
+    "@lendasat/lendaswap-sdk-pure": "^0.2.11",
     "viem": "^2.0.0"
   },
   "devDependencies": {

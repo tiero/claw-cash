@@ -10,6 +10,7 @@ import {
   toEvmChain,
   resolveCurrency,
   parseBtcAmount,
+  parseStablecoinAmount,
 } from "../utils/token.js";
 import type { ParsedArgs } from "minimist";
 
@@ -96,8 +97,9 @@ export async function handleSend(
     if (sats === null) return outputError(`Invalid amount: ${amountStr}`);
     amount = sats;
   } else {
-    amount = parseFloat(amountStr);
-    if (isNaN(amount) || amount <= 0) return outputError(`Invalid amount: ${amountStr}`);
+    const units = parseStablecoinAmount(amountStr, resolved, where);
+    if (units === null) return outputError(`Invalid amount: ${amountStr}`);
+    amount = units;
   }
 
   if (!isValidWhere(where)) {

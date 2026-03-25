@@ -135,7 +135,7 @@ app.get("/health", (c) => c.json({ ok: true, service: "api" }));
 // Swap proxy (CORS workaround for web UI)
 app.get("/v1/swaps/:id", async (c) => {
   const id = c.req.param("id");
-  const upstream = await fetch(`https://apilendaswap.lendasat.com/swap/${encodeURIComponent(id)}`);
+  const upstream = await fetch(`https://api.lendaswap.com/swap/${encodeURIComponent(id)}`);
   if (!upstream.ok) {
     const text = await upstream.text();
     throw new HTTPException(upstream.status === 400 ? 404 : (upstream.status as any), {

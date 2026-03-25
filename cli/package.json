@@ -20,7 +20,7 @@
   "dependencies": {
     "@arkade-os/boltz-swap": "^0.3.8",
     "@arkade-os/sdk": "^0.4.10",
-    "@lendasat/lendaswap-sdk-pure": "^0.0.2",
+    "@lendasat/lendaswap-sdk-pure": "^0.2.11",
     "@noble/hashes": "^2.0.1",
     "@scure/base": "^2.0.0",
     "@scure/btc-signer": "^2.0.1",

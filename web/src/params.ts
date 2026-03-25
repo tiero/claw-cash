@@ -42,6 +42,18 @@ export const TOKEN_DECIMALS: Record<string, number> = {
   usdt0_pol: 6, usdt_eth: 6, usdt_arb: 6,
 };
 
+/** Convert a human-readable amount (e.g. 1.02) to smallest token units (e.g. 1020000). */
+export function toSmallestUnit(amount: number, token: string): number {
+  const decimals = TOKEN_DECIMALS[token] ?? 6;
+  return Math.round(amount * 10 ** decimals);
+}
+
+/** Convert from smallest units (e.g. 1020000) to human-readable (e.g. 1.02). */
+export function fromSmallestUnit(smallest: number, token: string): number {
+  const decimals = TOKEN_DECIMALS[token] ?? 6;
+  return smallest / 10 ** decimals;
+}
+
 export const TOKEN_LABELS: Record<string, string> = {
   usdc_pol: "USDC", usdc_eth: "USDC", usdc_arb: "USDC",
   usdt0_pol: "USDT0", usdt_eth: "USDT", usdt_arb: "USDT",
@@ -155,27 +167,42 @@ export async function parseParams(): Promise<PaymentParams> {
     }
     const swap = await resp.json();
 
-    const token = swap.source_token as string;
+    // source_token is now a TokenInfo object { token_id, symbol, chain, decimals }
+    const sourceToken = swap.source_token;
+    const tokenId = typeof sourceToken === "string" ? sourceToken : sourceToken?.token_id ?? "";
+    const chainId = typeof sourceToken === "string" ? "" : sourceToken?.chain ?? "";
+    // Map token_id back to legacy token ID for UI lookups, or use chain ID to resolve chain name
+    const token = Object.entries(TOKEN_TO_CHAIN).find(
+      ([tid]) => TOKEN_DECIMALS[tid] !== undefined && tid.includes(chainId === "137" ? "pol" : chainId === "1" ? "eth" : chainId === "42161" ? "arb" : "")
+        && (tid.startsWith("usdc") ? sourceToken?.symbol === "USDC" : tid.startsWith("usdt") ? sourceToken?.symbol?.startsWith("USDT") : false)
+    )?.[0] ?? tokenId;
     const chain = TOKEN_TO_CHAIN[token] ?? "";
     const status = swap.status as string;
+    // source_amount is now a string
+    const amount = typeof swap.source_amount === "string" ? parseFloat(swap.source_amount) : swap.source_amount;
+    const decimals = (typeof sourceToken === "object" ? sourceToken.decimals : TOKEN_DECIMALS[token]) ?? 6;
+    const displayAmount = amount / (10 ** decimals);
 
     // Build funding call data from swap response
+    // Field names changed: htlc_address_evm → evm_htlc_address, source_token_address → source_token.token_id
+    const evmHtlcAddress = swap.evm_htlc_address ?? swap.htlc_address_evm;
+    const sourceTokenAddress = typeof sourceToken === "object" ? sourceToken.token_id : swap.source_token_address;
     let funding: FundingCallData | undefined;
-    if (FUNDABLE_STATUSES.has(status) && swap.create_swap_tx && swap.htlc_address_evm && swap.source_token_address) {
-      const approve = buildApproveCallData(swap.source_token_address, swap.htlc_address_evm);
+    if (FUNDABLE_STATUSES.has(status) && swap.create_swap_tx && evmHtlcAddress && sourceTokenAddress) {
+      const approve = buildApproveCallData(sourceTokenAddress, evmHtlcAddress);
       funding = {
         approveTo: approve.to,
         approveData: approve.data,
-        fundTo: swap.htlc_address_evm,
+        fundTo: evmHtlcAddress,
         fundData: swap.create_swap_tx,
       };
     }
 
     return {
-      amount: swap.source_amount,
+      amount: displayAmount,
       token,
       chain,
-      to: swap.htlc_address_arkade ?? swap.target_address ?? "",
+      to: swap.btc_vhtlc_address ?? swap.htlc_address_arkade ?? swap.target_arkade_address ?? "",
       status,
       swapId: swap.id,
       funding,

@@ -58,8 +58,8 @@ importers:
         specifier: ^0.4.10
         version: 0.4.10
       '@lendasat/lendaswap-sdk-pure':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.2.11
+        version: 0.2.11
       '@noble/hashes':
         specifier: ^2.0.1
         version: 2.0.1
@@ -160,8 +160,8 @@ importers:
         specifier: workspace:*
         version: link:../remote-signer-identity
       '@lendasat/lendaswap-sdk-pure':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.2.11
+        version: 0.2.11
     devDependencies:
       '@types/node':
         specifier: ^22.13.4
@@ -173,8 +173,8 @@ importers:
   web:
     dependencies:
       '@lendasat/lendaswap-sdk-pure':
-        specifier: ^0.0.2
-        version: 0.0.2
+        specifier: ^0.2.11
+        version: 0.2.11
       viem:
         specifier: ^2.0.0
         version: 2.45.3(typescript@5.9.3)(zod@4.3.6)
@@ -744,8 +744,8 @@ packages:
   '@kukks/bitcoin-descriptors@3.1.0':
     resolution: {integrity: sha512-7HOCZjufw3DIIDebx7/ZOeol6khkWoccM6vzee6t5bXOJoj/6ISdssEDhjxDgy88in/I39pKz+kzFukxK5eqVw==}
 
-  '@lendasat/lendaswap-sdk-pure@0.0.2':
-    resolution: {integrity: sha512-4N9ugC/5ja7p5U0pRfRhopxu7Nld5u94117kklucmjDd8zdLd4BUdIVXObLhwgze+/WvAaU6jCp/S3Maks54Lw==}
+  '@lendasat/lendaswap-sdk-pure@0.2.11':
+    resolution: {integrity: sha512-7EklpTxNmCpiOSDhyfihLTHhfhOCwnBX5yuLxQJ9PiaVq+s5h3O5Q3bBf1Qy691AMo6F0pSHPQEWKEiFM0liFg==}
 
   '@marcbachmann/cel-js@7.3.1':
     resolution: {integrity: sha512-P6o26TvjStT8V8+8EF+yq9Pp7ZFV00bpiUMbssr76XbIZGxaB+NNWeBp6WNxOrR9gp0JPzvJueCKHpOs5LE9PQ==}
@@ -2313,9 +2313,10 @@ snapshots:
       '@scure/bip32': 2.0.1
       '@scure/btc-signer': 2.0.1
 
-  '@lendasat/lendaswap-sdk-pure@0.0.2':
+  '@lendasat/lendaswap-sdk-pure@0.2.11':
     dependencies:
-      '@arkade-os/sdk': 0.3.13
+      '@arkade-os/sdk': 0.4.10
+      '@noble/curves': 2.0.1
       '@noble/hashes': 1.8.0
       '@scure/bip32': 1.7.0
       '@scure/bip39': 1.6.0
@@ -2324,6 +2325,12 @@ snapshots:
       openapi-fetch: 0.15.2
     optionalDependencies:
       better-sqlite3: 12.6.2
+    transitivePeerDependencies:
+      - '@react-native-async-storage/async-storage'
+      - expo
+      - expo-background-task
+      - expo-sqlite
+      - expo-task-manager
 
   '@marcbachmann/cel-js@7.3.1': {}
 

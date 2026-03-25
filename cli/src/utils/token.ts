@@ -1,4 +1,4 @@
-import type { StablecoinToken, EvmChain } from "@clw-cash/skills";
+import { toSmallestUnit, type StablecoinToken, type EvmChain } from "@clw-cash/skills";
 
 const TOKEN_MAP: Record<string, Record<string, StablecoinToken>> = {
   usdt: { polygon: "usdt0_pol", ethereum: "usdt_eth", arbitrum: "usdt_arb" },
@@ -65,4 +65,15 @@ export function toStablecoinToken(currency: string, chain: string): StablecoinTo
 
 export function toEvmChain(where: string): EvmChain {
   return where as EvmChain;
+}
+
+/**
+ * Parse a human-readable stablecoin amount (e.g. "1.02" for $1.02)
+ * and return the value in smallest token units (e.g. 1020000 for USDC).
+ */
+export function parseStablecoinAmount(amountStr: string, currency: string, where: string): number | null {
+  const value = parseFloat(amountStr);
+  if (isNaN(value) || value <= 0) return null;
+  const token = toStablecoinToken(currency, where);
+  return toSmallestUnit(value, token);
 }

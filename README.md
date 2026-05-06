@@ -68,7 +68,7 @@ No enclave redeploy needed for local development. The enclave service runs as a 
 # Auto-authenticates, creates an identity, saves config, starts daemon
 pnpm --filter ./cli dev -- init \
   --api-url http://127.0.0.1:4000 \
-  --ark-server https://server.arkade.fun
+  --ark-server https://arkade.computer
 ```
 
 In test mode (no `TELEGRAM_BOT_TOKEN` set), authentication resolves automatically. In production, a Telegram deep link is shown for 2FA confirmation.
@@ -97,7 +97,7 @@ export CLW_API_URL=http://127.0.0.1:4000
 export CLW_SESSION_TOKEN=<jwt>
 export CLW_IDENTITY_ID=<uuid>
 export CLW_PUBLIC_KEY=<hex>
-export CLW_ARK_SERVER_URL=https://server.arkade.fun
+export CLW_ARK_SERVER_URL=https://arkade.computer
 ```
 
 ## Testing
@@ -191,7 +191,7 @@ const bitcoin = await createClwBitcoinSkill({
   sessionToken: session.token,
   identityId: user.identityId,
   publicKey: user.publicKey,
-  arkServerUrl: "https://server.arkade.fun",
+  arkServerUrl: "https://arkade.computer",
 });
 
 // Use it

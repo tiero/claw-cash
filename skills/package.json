@@ -13,7 +13,7 @@
     "@arkade-os/boltz-swap": "^0.3.8",
     "@arkade-os/sdk": "^0.4.10",
     "@clw-cash/sdk": "workspace:*",
-    "@lendasat/lendaswap-sdk-pure": "^0.0.2"
+    "@lendasat/lendaswap-sdk-pure": "^0.2.11"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",

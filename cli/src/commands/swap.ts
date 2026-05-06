@@ -3,7 +3,7 @@ import { outputSuccess, outputError } from "../output.js";
 import { getDaemonUrl, daemonGet } from "../daemonClient.js";
 import type { ParsedArgs } from "minimist";
 
-const LENDASWAP_API = "https://apilendaswap.lendasat.com";
+const LENDASWAP_API = "https://api.lendaswap.com";
 
 export async function handleSwap(ctx: CashContext, args: ParsedArgs): Promise<never> {
   const swapId = (args._[1] as string) || (args.id as string);

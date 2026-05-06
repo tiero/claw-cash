@@ -5,6 +5,7 @@ export interface FundingCallData {
   approveData: string;
   fundTo: string;
   fundData: string;
+  approveSpender?: string;
 }
 
 export interface PaymentParams {
@@ -90,6 +91,12 @@ const TOKEN_TO_CHAIN: Record<string, string> = {
   usdt0_pol: "polygon", usdt_eth: "ethereum", usdt_arb: "arbitrum",
 };
 
+const CHAIN_ID_TO_CHAIN: Record<string, string> = {
+  "137": "polygon",
+  "1": "ethereum",
+  "42161": "arbitrum",
+};
+
 /** All supported chains for sender-side chain selection */
 export const SUPPORTED_CHAINS = ["polygon", "arbitrum", "ethereum"] as const;
 
@@ -98,6 +105,16 @@ export const CURRENCY_CHAIN_TO_TOKEN: Record<string, Record<string, string>> = {
   usdc: { polygon: "usdc_pol", ethereum: "usdc_eth", arbitrum: "usdc_arb" },
   usdt: { polygon: "usdt0_pol", ethereum: "usdt_eth", arbitrum: "usdt_arb" },
 };
+
+function tokenInfoToLegacyId(token: { chain?: string; symbol?: string; token_id?: string } | string | null | undefined): string {
+  if (typeof token === "string") return token;
+  const chain = CHAIN_ID_TO_CHAIN[String(token?.chain ?? "")];
+  const symbol = token?.symbol?.toLowerCase();
+  if (!chain || !symbol) return token?.token_id ?? "";
+  if (symbol === "usdc") return CURRENCY_CHAIN_TO_TOKEN.usdc[chain] ?? token?.token_id ?? "";
+  if (symbol === "usdt" || symbol === "usdt0") return CURRENCY_CHAIN_TO_TOKEN.usdt[chain] ?? token?.token_id ?? "";
+  return token?.token_id ?? "";
+}
 
 /** Statuses where funding has NOT yet happened — safe to show pay button */
 const FUNDABLE_STATUSES = new Set([
@@ -155,8 +172,9 @@ export async function parseParams(): Promise<PaymentParams> {
     }
     const swap = await resp.json();
 
-    const token = swap.source_token as string;
-    const chain = TOKEN_TO_CHAIN[token] ?? "";
+    const sourceToken = swap.source_token;
+    const token = tokenInfoToLegacyId(sourceToken);
+    const chain = TOKEN_TO_CHAIN[token] ?? CHAIN_ID_TO_CHAIN[String(sourceToken?.chain ?? "")] ?? "";
     const status = swap.status as string;
 
     // Build funding call data from swap response
@@ -172,7 +190,7 @@ export async function parseParams(): Promise<PaymentParams> {
     }
 
     return {
-      amount: swap.source_amount,
+      amount: Number(swap.source_amount) / 10 ** (sourceToken?.decimals ?? TOKEN_DECIMALS[token] ?? 6),
       token,
       chain,
       to: swap.htlc_address_arkade ?? swap.target_address ?? "",
@@ -201,7 +219,7 @@ export async function parseParams(): Promise<PaymentParams> {
 
     return {
       amount, token, chain, to, swapId, status: "pending",
-      funding: { approveTo, approveData, fundTo, fundData },
+      funding: { approveTo, approveData, fundTo, fundData, approveSpender: fundTo },
     };
   }
 

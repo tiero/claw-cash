@@ -8,6 +8,7 @@ import {
   toStablecoinToken,
   resolveCurrency,
   parseBtcAmount,
+  parseStablecoinAmount,
 } from "../utils/token.js";
 import type { CashConfig } from "../config.js";
 import type { ParsedArgs } from "minimist";
@@ -37,7 +38,7 @@ export async function handleReceive(
   if (resolved !== "btc" && !where) {
     if (!amountStr) {
       return outputError(
-        `Missing --amount <${currency}> (e.g. --amount 10 for 10 ${currency.toUpperCase()})`
+        `Missing --amount <${currency}> (e.g. --amount 1.02 for $1.02 ${currency.toUpperCase()})`
       );
     }
     const amount = parseFloat(amountStr);
@@ -78,7 +79,7 @@ export async function handleReceive(
     return outputError(
       resolved === "btc"
         ? `Missing --amount (${currency === "sats" ? "sats" : "BTC"} required for lightning invoices)`
-        : `Missing --amount <${resolved}> (e.g. --amount 10 for 10 ${resolved.toUpperCase()})`
+        : `Missing --amount <${resolved}> (e.g. --amount 1.02 for $1.02 ${resolved.toUpperCase()})`
     );
   }
 
@@ -90,8 +91,9 @@ export async function handleReceive(
       if (sats === null) return outputError(`Invalid amount: ${amountStr}`);
       amount = sats;
     } else {
-      amount = parseFloat(amountStr);
-      if (isNaN(amount) || amount <= 0) return outputError(`Invalid amount: ${amountStr}`);
+      const units = parseStablecoinAmount(amountStr, resolved, where);
+      if (units === null) return outputError(`Invalid amount: ${amountStr}`);
+      amount = units;
     }
   }
 

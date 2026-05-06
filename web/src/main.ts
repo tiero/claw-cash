@@ -83,6 +83,22 @@ async function main() {
           fundTo = params.funding.fundTo;
           fundData = params.funding.fundData;
           swapId = params.swapId;
+        } else if (params.swapId) {
+          // Pre-created by CLI — derive current Permit2 funding call data with the SDK.
+          swapId = params.swapId;
+          setStep("preparing-tx");
+          const callData = await getFundingCallData(swapId, selectedToken);
+          approveTo = callData.approve.to;
+          approveData = callData.approve.data;
+          fundTo = callData.createSwap.to;
+          fundData = callData.createSwap.data;
+          params.funding = {
+            approveTo,
+            approveData,
+            fundTo,
+            fundData,
+            approveSpender: callData.approve.spender,
+          };
         } else {
           // Web creates the swap (chain selected by sender or from URL)
           setStep("creating-swap");
@@ -92,11 +108,19 @@ async function main() {
           updateDebug({ swapId });
 
           setStep("preparing-tx");
+          if (!swapId) throw new Error("Swap creation did not return a swap ID");
           const callData = await getFundingCallData(swapId, selectedToken);
           approveTo = callData.approve.to;
           approveData = callData.approve.data;
           fundTo = callData.createSwap.to;
           fundData = callData.createSwap.data;
+          params.funding = {
+            approveTo,
+            approveData,
+            fundTo,
+            fundData,
+            approveSpender: callData.approve.spender,
+          };
         }
 
         // 2. Approve token spend (skip if allowance already sufficient)
@@ -105,7 +129,7 @@ async function main() {
           address: approveTo as `0x${string}`,
           abi: erc20Abi,
           functionName: "allowance",
-          args: [address, fundTo as `0x${string}`],
+          args: [address, (params.funding?.approveSpender ?? fundTo) as `0x${string}`],
         });
         updateDebug({ currentAllowance: currentAllowance.toString(), requiredAmount: requiredAmount.toString() });
 

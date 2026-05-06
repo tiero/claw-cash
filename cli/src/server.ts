@@ -5,7 +5,7 @@ import type { AuthMonitor } from "./authMonitor.js";
 import type { WebhookRegistry, SwapEventType } from "./notifier.js";
 import type { EvmChain, StablecoinToken, StablecoinSwapInfo, StablecoinSwapStatus } from "@clw-cash/skills";
 
-const LENDASWAP_API = "https://apilendaswap.lendasat.com";
+const LENDASWAP_API = "https://api.lendaswap.com";
 
 async function fetchRemoteSwap(swapId: string): Promise<Record<string, unknown> | null> {
   try {

@@ -273,6 +273,13 @@ npx wrangler kv key list --namespace-id=<ID>
   - Check Worker logs: `npx wrangler tail`
   - Re-set webhook URL if needed.
 
+- **Auth deep link points to a nonexistent Telegram user** (e.g. `https://t.me/undefined?start=...`):
+  - The `TELEGRAM_BOT_USERNAME` secret is missing or invalid on the deployed Worker. `deploy.sh` used to silently skip empty secrets, so the binding could be absent while `TELEGRAM_BOT_TOKEN` was set.
+  - Check: `npx wrangler secret list --env production --config api/wrangler.toml`
+  - Fix: set it to the bot's username (the `..._bot` handle from @BotFather, **without** `@`, not the display name):
+    `echo "<bot_username>" | npx wrangler secret put TELEGRAM_BOT_USERNAME --env production --config api/wrangler.toml`
+  - The API now omits `deep_link` (returns `null`) and logs a warning instead of emitting a broken link; `deploy.sh` refuses to deploy a bot token without a valid username.
+
 - **CORS errors on web UI**: verify `ALLOWED_ORIGINS` in `wrangler.toml` includes `https://pay.clw.cash`.
 
 ## Secrets Rotation

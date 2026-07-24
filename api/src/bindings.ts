@@ -11,7 +11,8 @@ export interface Env {
   TICKET_SIGNING_SECRET: string;
   SESSION_SIGNING_SECRET: string;
   TELEGRAM_BOT_TOKEN: string;
-  TELEGRAM_BOT_USERNAME: string;
+  // Optional at runtime: deploy.sh skips empty secrets, so the binding may be absent
+  TELEGRAM_BOT_USERNAME?: string;
   TELEGRAM_ADMIN_CHAT_ID: string;
   EV_API_KEY: string;
 

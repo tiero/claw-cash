@@ -162,7 +162,7 @@ app.post("/v1/auth/challenge", async (c) => {
     {
       challenge_id: challenge.id,
       expires_at: challenge.expires_at,
-      deep_link: botEnabled ? `https://t.me/${c.env.TELEGRAM_BOT_USERNAME}?start=${challenge.id}` : null,
+      deep_link: botEnabled ? `https://t.me/${c.env.TELEGRAM_BOT_USERNAME.trim().replace(/^@/, "")}?start=${challenge.id}` : null,
     },
     201,
   );

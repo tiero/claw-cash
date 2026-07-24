@@ -20,6 +20,7 @@ import {
 } from "./validation.js";
 import type { SessionClaims, SupportedAlg, Identity } from "./types.js";
 import { sendDailyDigest } from "./digest.js";
+import { buildTelegramDeepLink } from "./telegram.js";
 
 type HonoEnv = { Bindings: Env; Variables: { auth: SessionClaims } };
 
@@ -158,11 +159,18 @@ app.post("/v1/auth/challenge", async (c) => {
     await store.resolveChallenge(challenge.id, body.telegram_user_id);
   }
 
+  const deepLink = botEnabled ? buildTelegramDeepLink(c.env.TELEGRAM_BOT_USERNAME, challenge.id) : null;
+  if (botEnabled && !deepLink) {
+    console.error(
+      "[auth] TELEGRAM_BOT_TOKEN is set but TELEGRAM_BOT_USERNAME is missing or invalid — deep_link omitted. Set the bot username secret (without @).",
+    );
+  }
+
   return c.json(
     {
       challenge_id: challenge.id,
       expires_at: challenge.expires_at,
-      deep_link: botEnabled ? `https://t.me/${c.env.TELEGRAM_BOT_USERNAME}?start=${challenge.id}` : null,
+      deep_link: deepLink,
     },
     201,
   );

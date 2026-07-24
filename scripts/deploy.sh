@@ -35,6 +35,21 @@ require_var() {
   fi
 }
 
+# The auth deep link is https://t.me/$TELEGRAM_BOT_USERNAME?start=... — deploying a
+# bot token without a username produces links to a nonexistent Telegram user.
+check_telegram_config() {
+  if [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]]; then
+    # Normalize a pasted "@botname" to "botname" — t.me links need the bare username
+    TELEGRAM_BOT_USERNAME="${TELEGRAM_BOT_USERNAME#@}"
+    if [[ -z "${TELEGRAM_BOT_USERNAME:-}" ]]; then
+      die "TELEGRAM_BOT_TOKEN is set but TELEGRAM_BOT_USERNAME is empty — auth deep links would point to https://t.me/undefined. Set TELEGRAM_BOT_USERNAME (without @) in $ENV_FILE"
+    fi
+    if [[ ! "$TELEGRAM_BOT_USERNAME" =~ ^[A-Za-z][A-Za-z0-9_]{4,31}$ ]]; then
+      die "TELEGRAM_BOT_USERNAME '$TELEGRAM_BOT_USERNAME' is not a valid Telegram username (5-32 chars, letters/digits/underscore, no @, no URL)"
+    fi
+  fi
+}
+
 # ── Generate secrets ─────────────────────────────────────────────────
 generate_secrets() {
   info "Generating fresh secrets..."
@@ -153,6 +168,7 @@ deploy_api() {
   require_var TICKET_SIGNING_SECRET
   require_var SESSION_SIGNING_SECRET
   require_var EV_API_KEY
+  check_telegram_config
 
   # Set secrets on CF Worker
   info "Setting Worker secrets..."
@@ -181,6 +197,7 @@ deploy_worker_api() {
   require_var TICKET_SIGNING_SECRET
   require_var SESSION_SIGNING_SECRET
   require_var WORKER_SEALING_KEY
+  check_telegram_config
 
   # Set secrets on CF Worker (no EV_API_KEY or INTERNAL_API_KEY needed)
   info "Setting Worker secrets..."
